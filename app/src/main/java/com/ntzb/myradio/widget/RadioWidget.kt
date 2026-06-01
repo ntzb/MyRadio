@@ -1,9 +1,11 @@
 package com.ntzb.myradio.widget
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
@@ -29,15 +31,14 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.defaultWeight
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import androidx.glance.material3.GlanceTheme
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import com.ntzb.myradio.R
 import com.ntzb.myradio.data.LikesRepository
 import com.ntzb.myradio.data.PlaybackSnapshot
@@ -51,6 +52,24 @@ import okhttp3.Request
 
 val STATION_ID_PARAM = ActionParameters.Key<String>("station_id")
 
+/** Simple light/dark palette so the widget themes itself without depending on GlanceTheme. */
+private data class WColors(
+    val bg: Color, val onBg: Color,
+    val tile: Color, val header: Color, val onHeader: Color
+)
+
+private fun colorsFor(context: Context): WColors {
+    val dark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+        Configuration.UI_MODE_NIGHT_YES
+    return if (dark) WColors(
+        bg = Color(0xFF1C1B1F), onBg = Color(0xFFE6E1E5),
+        tile = Color(0xFF2B2930), header = Color(0xFF332D41), onHeader = Color(0xFFE8DEF8)
+    ) else WColors(
+        bg = Color(0xFFFFFBFE), onBg = Color(0xFF1C1B1F),
+        tile = Color(0xFFECE6F0), header = Color(0xFFE8DEF8), onHeader = Color(0xFF1D192B)
+    )
+}
+
 class RadioWidget : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Exact
@@ -60,22 +79,19 @@ class RadioWidget : GlanceAppWidget() {
         val liked = LikesRepository.snapshot(context)
         val shown = stations.filter { it.id in liked }.ifEmpty { stations }.take(30)
         val nowPlaying = PlaybackSnapshot.read(context)
-        // Glance can't load URLs into Image — pre-decode logos to bitmaps (downscaled).
+        val c = colorsFor(context)
+        // Glance can't load URLs into Image — pre-decode logos to bitmaps (cached, downscaled).
         val bitmaps = shown.associate { it.id to loadLogoBitmap(context, it.logoUri) }
 
         provideContent {
-            GlanceTheme {
-                Column(
-                    GlanceModifier.fillMaxSize()
-                        .background(GlanceTheme.colors.widgetBackground)
-                        .padding(8.dp)
-                ) {
-                    Header(nowPlaying.title, nowPlaying.song, nowPlaying.isPlaying)
-                    Spacer(GlanceModifier.size(6.dp))
-                    LazyVerticalGrid(gridCells = GridCells.Adaptive(72.dp)) {
-                        items(shown, itemId = { it.id.hashCode().toLong() }) { station ->
-                            StationTile(station, bitmaps[station.id])
-                        }
+            Column(
+                GlanceModifier.fillMaxSize().background(ColorProvider(c.bg)).padding(8.dp)
+            ) {
+                Header(nowPlaying.title, nowPlaying.song, nowPlaying.isPlaying, c)
+                Spacer(GlanceModifier.size(6.dp))
+                LazyVerticalGrid(gridCells = GridCells.Adaptive(72.dp)) {
+                    items(shown, itemId = { it.id.hashCode().toLong() }) { station ->
+                        StationTile(station, bitmaps[station.id], c)
                     }
                 }
             }
@@ -83,40 +99,32 @@ class RadioWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun Header(title: String, song: String, isPlaying: Boolean) {
+    private fun Header(title: String, song: String, isPlaying: Boolean, c: WColors) {
         Row(
-            GlanceModifier.fillMaxWidth()
-                .background(GlanceTheme.colors.secondaryContainer)
-                .cornerRadius(12.dp)
-                .padding(8.dp),
+            GlanceModifier.fillMaxWidth().background(ColorProvider(c.header)).cornerRadius(12.dp).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(GlanceModifier.defaultWeight()) {
                 Text(
                     text = title.ifBlank { "Not playing" },
                     maxLines = 1,
-                    style = TextStyle(color = GlanceTheme.colors.onSecondaryContainer)
+                    style = TextStyle(color = ColorProvider(c.onHeader))
                 )
                 if (song.isNotBlank()) {
-                    Text(
-                        text = song,
-                        maxLines = 1,
-                        style = TextStyle(color = GlanceTheme.colors.onSecondaryContainer)
-                    )
+                    Text(text = song, maxLines = 1, style = TextStyle(color = ColorProvider(c.onHeader)))
                 }
             }
             ControlIcon(
                 if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
-                "Play/Pause",
-                actionRunCallback<TogglePlayAction>()
+                "Play/Pause", actionRunCallback<TogglePlayAction>(), c
             )
             Spacer(GlanceModifier.width(4.dp))
-            ControlIcon(R.drawable.ic_stop, "Stop", actionRunCallback<StopAction>())
+            ControlIcon(R.drawable.ic_stop, "Stop", actionRunCallback<StopAction>(), c)
         }
     }
 
     @Composable
-    private fun ControlIcon(resId: Int, desc: String, action: Action) {
+    private fun ControlIcon(resId: Int, desc: String, action: Action, c: WColors) {
         Box(
             GlanceModifier.size(40.dp).cornerRadius(20.dp).clickable(action),
             contentAlignment = Alignment.Center
@@ -124,19 +132,17 @@ class RadioWidget : GlanceAppWidget() {
             Image(
                 provider = ImageProvider(resId),
                 contentDescription = desc,
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.onSecondaryContainer),
+                colorFilter = ColorFilter.tint(ColorProvider(c.onHeader)),
                 modifier = GlanceModifier.size(24.dp)
             )
         }
     }
 
     @Composable
-    private fun StationTile(station: Station, bitmap: Bitmap?) {
+    private fun StationTile(station: Station, bitmap: Bitmap?, c: WColors) {
         Box(GlanceModifier.padding(4.dp), contentAlignment = Alignment.Center) {
             Box(
-                GlanceModifier.size(64.dp)
-                    .background(GlanceTheme.colors.surfaceVariant)
-                    .cornerRadius(12.dp)
+                GlanceModifier.size(64.dp).background(ColorProvider(c.tile)).cornerRadius(12.dp)
                     .clickable(
                         actionRunCallback<PlayStationAction>(
                             actionParametersOf(STATION_ID_PARAM to station.id)
@@ -154,7 +160,7 @@ class RadioWidget : GlanceAppWidget() {
                     Image(
                         provider = ImageProvider(R.drawable.ic_radio),
                         contentDescription = station.name,
-                        colorFilter = ColorFilter.tint(GlanceTheme.colors.onSurfaceVariant),
+                        colorFilter = ColorFilter.tint(ColorProvider(c.onBg)),
                         modifier = GlanceModifier.size(32.dp)
                     )
                 }
@@ -163,12 +169,17 @@ class RadioWidget : GlanceAppWidget() {
     }
 }
 
-/** Loads a logo bitmap from a bundled asset or remote URL, downscaled for widget memory limits. */
-private suspend fun loadLogoBitmap(context: Context, uri: String): Bitmap? =
-    withContext(Dispatchers.IO) {
+// Logos are static, but provideGlance reruns on every now-playing change. Cache decoded
+// bitmaps process-wide so a song-title tick doesn't re-decode every liked station's logo.
+private val logoCache = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+
+/** Loads a logo bitmap from a bundled asset or remote URL, downscaled and cached. */
+private suspend fun loadLogoBitmap(context: Context, uri: String): Bitmap? {
+    if (uri.isBlank()) return null
+    logoCache[uri]?.let { return it }
+    return withContext(Dispatchers.IO) {
         runCatching {
             val bytes = when {
-                uri.isBlank() -> null
                 uri.startsWith("file:///android_asset/") ->
                     context.assets.open(uri.removePrefix("file:///android_asset/")).use { it.readBytes() }
                 uri.startsWith("http") -> {
@@ -179,8 +190,9 @@ private suspend fun loadLogoBitmap(context: Context, uri: String): Bitmap? =
             } ?: return@runCatching null
             val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-        }.getOrNull()
+        }.getOrNull()?.also { logoCache[uri] = it }
     }
+}
 
 // --- Action callbacks ---------------------------------------------------------
 

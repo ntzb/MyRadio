@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ntzb.myradio.data.StreamResolver
@@ -62,7 +63,15 @@ object PlayerController {
 
     suspend fun togglePlayPause(context: Context) {
         val c = get(context)
-        withContext(Dispatchers.Main) { if (c.isPlaying) c.pause() else c.play() }
+        withContext(Dispatchers.Main) {
+            if (c.isPlaying) {
+                c.pause()
+            } else {
+                // After stop() the player is IDLE and needs re-preparing before it can play.
+                if (c.playbackState == Player.STATE_IDLE) c.prepare()
+                c.play()
+            }
+        }
     }
 
     suspend fun stop(context: Context) {

@@ -54,9 +54,11 @@ object PlayerFactory {
      * declare APPLICATION_MPD explicitly or it would wrongly fall through to progressive.
      */
     fun buildMediaItem(station: Station, url: String): MediaItem {
+        // MIME is derived from the URL, never the module: a Kan station's fallback can be a
+        // plain .mp3 (e.g. the StreamTheWorld mirror), which must NOT be treated as DASH.
+        // Kan's primary .livx is DASH; dvr is already stripped so it ends with ".livx".
         val mime = when {
-            station.module == "kan" || url.endsWith(".livx") || url.contains(".mpd") ->
-                MimeTypes.APPLICATION_MPD
+            url.endsWith(".livx") || url.contains(".mpd") -> MimeTypes.APPLICATION_MPD
             url.contains(".m3u8") -> MimeTypes.APPLICATION_M3U8
             else -> null
         }

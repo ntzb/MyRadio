@@ -2,6 +2,7 @@ package com.ntzb.myradio.player
 
 import android.content.Intent
 import androidx.annotation.OptIn
+import androidx.glance.appwidget.updateAll
 import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
