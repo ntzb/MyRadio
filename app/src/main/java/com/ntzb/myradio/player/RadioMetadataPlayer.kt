@@ -4,7 +4,6 @@ import androidx.annotation.OptIn
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
-import androidx.media3.common.util.FlagSet
 import androidx.media3.common.util.UnstableApi
 
 /**
@@ -28,12 +27,10 @@ class RadioMetadataPlayer(player: Player) : ForwardingPlayer(player) {
         if (song == this.song) return
         this.song = song
         val md = mediaMetadata
-        val events = Player.Events(
-            FlagSet.Builder().add(Player.EVENT_MEDIA_METADATA_CHANGED).build()
-        )
+        // MediaSession's player listener reacts to onMediaMetadataChanged and refreshes the
+        // notification / connected controllers. (No synthetic onEvents — FlagSet isn't public API.)
         for (l in listeners.toList()) {
             l.onMediaMetadataChanged(md)
-            l.onEvents(this, events)
         }
     }
 
