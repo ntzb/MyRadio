@@ -8,6 +8,7 @@ import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.extractor.metadata.icy.IcyInfo
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -32,7 +33,8 @@ import kotlinx.coroutines.launch
 class PlaybackService : MediaSessionService() {
 
     private var session: MediaSession? = null
-    private var player: Player? = null
+    private var exo: ExoPlayer? = null                     // real player; our listener attaches here
+    private var metadataPlayer: RadioMetadataPlayer? = null // wraps exo, injects song for notification
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     @Volatile private var icySong: String = ""     // from ICY (Icecast streams)
@@ -65,13 +67,13 @@ class PlaybackService : MediaSessionService() {
                     if (title.isNotBlank()) icySong = title
                 }
             }
-            player?.let { publish(it) }
+            exo?.let { publish(it) }
         }
 
         override fun onPlayerError(error: PlaybackException) {
             // Try the next fallback URL for this station, if any.
             val next = PlaybackFallback.nextItem() ?: return
-            player?.apply {
+            exo?.apply {
                 setMediaItem(next)
                 prepare()
                 play()
@@ -81,9 +83,11 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
-        val exo = PlayerFactory.buildExoPlayer(this)
-        exo.addListener(listener)
-        player = exo
+        val exoPlayer = PlayerFactory.buildExoPlayer(this)
+        exoPlayer.addListener(listener)
+        val fwd = RadioMetadataPlayer(exoPlayer)
+        exo = exoPlayer
+        metadataPlayer = fwd
         // Tapping the media notification opens the app.
         val openApp = PendingIntent.getActivity(
             this,
@@ -91,7 +95,8 @@ class PlaybackService : MediaSessionService() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE
         )
-        session = MediaSession.Builder(this, exo).setSessionActivity(openApp).build()
+        // The session uses the forwarding player so notification/controllers see the song.
+        session = MediaSession.Builder(this, fwd).setSessionActivity(openApp).build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -102,13 +107,12 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        session?.run {
-            player.removeListener(listener)
-            player.release()
-            release()
-        }
+        exo?.removeListener(listener)
+        session?.release()
+        metadataPlayer?.release()   // ForwardingPlayer.release() releases the wrapped ExoPlayer too
         session = null
-        player = null
+        exo = null
+        metadataPlayer = null
         scope.cancel()
         super.onDestroy()
     }
@@ -123,7 +127,7 @@ class PlaybackService : MediaSessionService() {
                 val s = NowPlayingResolver.fetch(stationId).orEmpty()
                 if (s != polledSong) {
                     polledSong = s
-                    player?.let { publish(it) }
+                    exo?.let { publish(it) }
                 }
                 delay(20_000)
             }
@@ -136,6 +140,8 @@ class PlaybackService : MediaSessionService() {
         val stationName = md.station?.toString() ?: md.title?.toString().orEmpty()
         val mdSong = md.title?.toString()?.takeIf { it.isNotBlank() && it != stationName }.orEmpty()
         val song = mdSong.ifBlank { icySong }.ifBlank { polledSong }
+        // Inject the song into the notification/controller metadata (no re-buffer).
+        metadataPlayer?.setSong(song)
         scope.launch {
             PlaybackSnapshot.write(
                 this@PlaybackService,

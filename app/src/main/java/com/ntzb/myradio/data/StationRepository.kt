@@ -39,7 +39,12 @@ object StationRepository {
         val channels = runCatching { parseChannels(readChannels(context)) }.getOrElse { emptyList() }
         val extras = runCatching { parseExtra(readExtra(context)) }.getOrElse { emptyList() }
         (channels + extras)
-            .map { st -> st.copy(urls = (st.urls + (backups[st.id] ?: emptyList())).distinct()) }
+            .map { st ->
+                st.copy(
+                    image = logoOverrides[st.id] ?: st.image,
+                    urls = (st.urls + (backups[st.id] ?: emptyList())).distinct()
+                )
+            }
             .distinctBy { it.id }
     }
 
@@ -129,6 +134,16 @@ object StationRepository {
 
     private fun JsonObject.str(key: String): String? =
         this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+
+    /**
+     * Better logos for specific idanplus stations (their channels.json art is poor). These are
+     * bundled PNGs in assets/logos (downloaded from Wikimedia, not hotlinked), so they work offline.
+     */
+    private val logoOverrides = mapOf(
+        "rd_88" to "kan88.png",
+        "rd_99" to "eco99.png",
+        "rd_music" to "kol_hamusica.png"
+    )
 
     /** Hardcoded fallback streams (appended after the primary), by idanplus station id. */
     private val backups = mapOf(

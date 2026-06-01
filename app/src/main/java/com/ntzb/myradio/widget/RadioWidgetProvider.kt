@@ -52,8 +52,10 @@ class RadioWidgetProvider : AppWidgetProvider() {
 
     private fun adjustVolume(context: Context, direction: Int) {
         val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        // FLAG_SHOW_UI pops the system volume slider; STREAM_MUSIC follows BT/speaker routing.
-        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
+        // Adjust silently (no FLAG_SHOW_UI). The system volume panel is an overlay that the next
+        // tap dismisses, which made the panel flicker show/hide on alternating taps. STREAM_MUSIC
+        // still follows BT/speaker routing; each tap reliably steps the volume.
+        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0)
     }
 
     /** Run suspend work from a broadcast, keeping the process alive until it finishes. */

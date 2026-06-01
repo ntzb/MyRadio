@@ -18,10 +18,7 @@ import okhttp3.Request
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
-
-// Target for the SHORTER side of a logo. The bitmap keeps its aspect ratio; the ImageView's
-// centerCrop fills the square tile. High enough to look crisp on dense screens.
-private const val LOGO_PX = 256
+import kotlin.math.sqrt
 
 /**
  * Backs the widget's liked-stations GridView. Using a RemoteViewsFactory (rather than the API-31
@@ -85,7 +82,7 @@ class StationGridFactory(private val context: Context) : RemoteViewsService.Remo
 
     private fun logoFor(station: Station): Bitmap =
         runCatching { loadLogo(station.logoUri) }.getOrNull()
-            ?: LogoGenerator.generate(station.name, LOGO_PX)
+            ?: LogoGenerator.generate(station.name)
 
     private fun loadLogo(uri: String): Bitmap? {
         if (uri.isBlank()) return null
@@ -99,23 +96,27 @@ class StationGridFactory(private val context: Context) : RemoteViewsService.Remo
             else -> null
         } ?: return null
 
-        // Decode bounds first, pick a sample size near the target (keeps decode cheap).
+        // Decode at the logo's native resolution — no fixed size cap, so they render crisp.
+        // The only scaling is a safety guard below.
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         val w = bounds.outWidth
         val h = bounds.outHeight
         if (w <= 0 || h <= 0) return null
+        // Anti-OOM: never decode a large source at full size — the final bitmap is capped below
+        // anyway, so cap the decode near that (≤ ~1024px → ≤ ~4 MB transient, vs tens of MB).
         var sample = 1
-        while (minOf(w, h) / (sample * 2) >= LOGO_PX) sample *= 2
+        while (maxOf(w, h) / (sample * 2) >= 1024) sample *= 2
         val decoded = BitmapFactory.decodeByteArray(
             bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }
         ) ?: return null
 
-        // Downscale preserving aspect ratio so the SHORTER side == LOGO_PX. NOT forced square —
-        // the ImageView's centerCrop trims the overflow, so logos crop instead of stretch.
-        val minSide = minOf(decoded.width, decoded.height)
-        val scaled = if (minSide > LOGO_PX) {
-            val factor = LOGO_PX.toFloat() / minSide
+        // Anti-binder-overflow: a single tile's bitmap must stay under the RemoteViews parcel
+        // limit (~1 MB), else the launcher silently drops the item. Scale down only if needed;
+        // aspect ratio is preserved and centerCrop fills the tile.
+        val maxBytes = 900_000
+        val safe = if (decoded.byteCount > maxBytes) {
+            val factor = sqrt(maxBytes.toDouble() / decoded.byteCount)
             Bitmap.createScaledBitmap(
                 decoded,
                 (decoded.width * factor).roundToInt().coerceAtLeast(1),
@@ -125,7 +126,7 @@ class StationGridFactory(private val context: Context) : RemoteViewsService.Remo
         } else {
             decoded
         }
-        return scaled.also { cache[uri] = it }
+        return safe.also { cache[uri] = it }
     }
 
     private companion object {
