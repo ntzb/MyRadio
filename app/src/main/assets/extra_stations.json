@@ -1,0 +1,36 @@
+{
+  "_comment": "Extra stations not in the idanplus channels.json. This file is bundled as a fallback AND fetched from your repo every 24h (see EXTRA_STATIONS_URL in StationRepository.kt). Edit + push to add/update stations without rebuilding. Fields: id (unique), name, module ('radio' = direct play; supports regex/ch like channels.json), image (filename in assets/logos or http URL or ''), urls (ordered: primary first, then fallbacks).",
+  "stations": [
+    {
+      "id": "x_kjazz",
+      "name": "KJazz 88.1 (KKJZ)",
+      "module": "radio",
+      "image": "",
+      "urls": [
+        "https://streaming.live365.com/a49833",
+        "https://streaming.live365.com/a45189_2"
+      ]
+    },
+    {
+      "id": "x_eagle",
+      "name": "104.9 The Eagle (WEGE)",
+      "module": "radio",
+      "image": "",
+      "urls": [
+        "https://crystalout.surfernetwork.com:8001/WEGE-FM_MP3",
+        "http://crystalout.surfernetwork.com:8001/WEGE-FM_MP3",
+        "https://stream.surfernetwork.com/y06oorxztbzuv"
+      ]
+    },
+    {
+      "id": "x_nostalgia",
+      "name": "רדיוס נוסטלגי 96.3",
+      "module": "radio",
+      "image": "",
+      "urls": [
+        "https://cdna.streamgates.net/radios-audio/Nostalgia_963fm/icecast.audio",
+        "http://194.213.4.197:8000/;stream/1"
+      ]
+    }
+  ]
+}
