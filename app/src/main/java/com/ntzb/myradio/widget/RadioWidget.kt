@@ -1,6 +1,7 @@
 package com.ntzb.myradio.widget
 
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -9,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
+import androidx.glance.LocalContext
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
@@ -107,12 +109,14 @@ class RadioWidget : GlanceAppWidget() {
 
     @Composable
     private fun Header(title: String, song: String, isPlaying: Boolean, c: WColors) {
+        val context = LocalContext.current
+        val openApp = actionStartActivity(Intent(context, MainActivity::class.java))
         Row(
             GlanceModifier.fillMaxWidth().background(ColorProvider(c.header)).cornerRadius(12.dp).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Tapping the header (station info area) opens the app.
-            Column(GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
+            Column(GlanceModifier.defaultWeight().clickable(openApp)) {
                 Text(
                     text = title.ifBlank { "Not playing" },
                     maxLines = 1,
