@@ -4,22 +4,19 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <!-- Box fills the (stretched) column so the logo grows with the widget size. -->
+    <!-- Fixed-height white card → all cells the same height, so the logo centers (no top gap)
+         and white fills the cell around it. -->
     <FrameLayout
         android:id="@+id/tile_box"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="90dp"
         android:padding="6dp"
         android:background="@drawable/tile_bg">
 
         <ImageView
             android:id="@+id/tile_logo"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:minHeight="48dp"
-            android:maxHeight="150dp"
-            android:adjustViewBounds="true"
+            android:layout_height="match_parent"
             android:scaleType="fitCenter"
             android:contentDescription="@string/play" />
     </FrameLayout>

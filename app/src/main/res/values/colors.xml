@@ -2,10 +2,10 @@
 <resources>
     <color name="ic_launcher_background">#1B3A5B</color>
 
-    <!-- Widget palette (light). The -night variant overrides these automatically. -->
-    <color name="widget_bg">#FFF7F7F8</color>
-    <color name="widget_text">#FF121212</color>
-    <color name="widget_text_dim">#FF5A5A5A</color>
-    <color name="widget_icon">#FF1B3A5B</color>
-    <color name="widget_playing_fill">#1A1B3A5B</color>
+    <!-- Widget chrome sits on the glassy dark panel, so text/icons are always light. -->
+    <color name="widget_bg">#CC26262B</color>
+    <color name="widget_text">#FFF3F3F3</color>
+    <color name="widget_text_dim">#FFC2C2C2</color>
+    <color name="widget_icon">#FFEDEDED</color>
+    <color name="widget_playing_fill">#FFFFFFFF</color>
 </resources>

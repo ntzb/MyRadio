@@ -62,7 +62,7 @@ object WidgetUpdater {
         // Scale the header text with the widget's width so it isn't tiny on a large (tablet) widget.
         val opts = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
         val minWidthDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
-        val titleSp = (if (minWidthDp > 0) minWidthDp / 16f else 16f).coerceIn(16f, 30f)
+        val titleSp = (if (minWidthDp > 0) minWidthDp / 13f else 20f).coerceIn(20f, 39f)
         views.setTextViewTextSize(R.id.np_title, TypedValue.COMPLEX_UNIT_SP, titleSp)
         views.setTextViewTextSize(R.id.np_song, TypedValue.COMPLEX_UNIT_SP, (titleSp - 3f))
 
