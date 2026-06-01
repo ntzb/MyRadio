@@ -14,7 +14,6 @@ import androidx.media3.session.MediaSessionService
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.NowPlayingResolver
 import com.ntzb.myradio.data.PlaybackSnapshot
-import com.ntzb.myradio.widget.WidgetSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,9 +24,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Hosts the single ExoPlayer + MediaSession. UI and widget control it through MediaController
+ * Hosts the single ExoPlayer + MediaSession. The UI controls it through MediaController
  * (PlayerController). This service owns playback, the media notification, ICY metadata, the
- * fallback-to-next-URL logic on error, and mirrors state into PlaybackSnapshot + the widget.
+ * fallback-to-next-URL logic on error, and mirrors state into PlaybackSnapshot.
  */
 class PlaybackService : MediaSessionService() {
 
@@ -140,7 +139,6 @@ class PlaybackService : MediaSessionService() {
                 this@PlaybackService,
                 NowPlaying(stationId, stationName, song, p.isPlaying)
             )
-            WidgetSync.sync(this@PlaybackService)
         }
     }
 }

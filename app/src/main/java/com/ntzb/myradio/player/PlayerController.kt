@@ -11,7 +11,6 @@ import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StreamResolver
 import com.ntzb.myradio.model.Station
-import com.ntzb.myradio.widget.WidgetSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,16 +20,16 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * Process-wide single MediaController shared by the UI and the widget, so commands from either
- * drive the same session without controller-release races. The controller lives for the process.
+ * Process-wide single MediaController used by the UI, so commands drive the same session
+ * without controller-release races. The controller lives for the process.
  */
 object PlayerController {
 
     private val mutex = Mutex()
     @Volatile private var controller: MediaController? = null
 
-    // MediaController must only be touched on the main thread (it throws otherwise). Widget
-    // ActionCallbacks run on a background thread, so the whole get() runs on Main.
+    // MediaController must only be touched on the main thread (it throws otherwise),
+    // so the whole get() runs on Main.
     suspend fun get(context: Context): MediaController = withContext(Dispatchers.Main) {
         controller?.let { if (it.isConnected) return@withContext it }
         mutex.withLock {
@@ -54,11 +53,9 @@ object PlayerController {
         }
 
     suspend fun playStation(context: Context, station: Station) {
-        // Update the snapshot + widget FIRST (instant), before the possibly-slow resolve/connect.
-        // A widget tap runs in a short-lived Glance action coroutine that can be killed before
-        // playback finishes — doing this up front guarantees the header reflects the new station.
+        // Write the snapshot FIRST (instant) so the now-playing strip reflects the new station
+        // immediately, before the possibly-slow stream resolve/connect.
         PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
-        WidgetSync.sync(context)
 
         val candidates = StreamResolver.resolveCandidates(station)   // resolves on IO
         PlaybackFallback.set(station, candidates)
@@ -86,7 +83,7 @@ object PlayerController {
 
     suspend fun stop(context: Context) {
         val c = get(context)
-        // Stop AND clear the item so the now-playing strip/widget reset to "Not playing".
+        // Stop AND clear the item so the now-playing strip resets to "Not playing".
         withContext(Dispatchers.Main) {
             c.stop()
             c.clearMediaItems()

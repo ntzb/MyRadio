@@ -29,7 +29,7 @@ object LikesRepository {
     }
 }
 
-/** Now-playing snapshot, shared so the widget (and a freshly launched UI) can render state. */
+/** Now-playing snapshot, so a freshly launched UI can render the last-known state. */
 data class NowPlaying(
     val stationId: String? = null,
     val title: String = "",

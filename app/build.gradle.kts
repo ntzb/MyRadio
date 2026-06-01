@@ -83,9 +83,6 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.media3.datasource.okhttp)
 
-    implementation(libs.androidx.glance.appwidget)
-    implementation(libs.androidx.glance.material3)
-
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
 

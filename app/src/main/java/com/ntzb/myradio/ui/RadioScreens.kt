@@ -295,7 +295,7 @@ fun StationLogo(uri: String, name: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** Fallback avatar generated from the station name (matches the widget's generated logos). */
+/** Fallback avatar generated from the station name. */
 @Composable
 private fun GeneratedLogo(name: String, modifier: Modifier = Modifier) {
     val bmp = remember(name) { LogoGenerator.generate(name).asImageBitmap() }

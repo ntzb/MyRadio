@@ -1,6 +1,6 @@
 # MyRadio
 
-A native Android radio app + home-screen widget. Station list and logos are reused from the
+A native Android radio app. Station list and logos are reused from the
 [idanplus Kodi addon](https://github.com/Fishenzon/repo); built to play Israeli stations
 (including Kan's DASH streams that trip up most apps) plus a few extras.
 
@@ -9,9 +9,8 @@ A native Android radio app + home-screen widget. Station list and logos are reus
 - **Station list** with one-tap play, current-station highlight.
 - **Like (♥)** stations — persisted; bottom tabs switch **Liked / All**.
 - **Now-playing strip** above the tabs (play/pause/stop) → tap to open the **Now-Playing screen** (controls, volume, song title via ICY metadata).
-- **Glance widget**: responsive grid of your liked stations as tap-to-play icons, with a header showing the current station + play/pause/stop.
 - **24h auto-refresh** of the station list from the idanplus GitHub `channels.json`, with the bundled copy as a fallback and hardcoded **backup streams**.
-- **Auto / light / dark** theming (Material You dynamic color) for both app and widget.
+- **Auto / light / dark** theming (Material You dynamic color).
 - **Live-radio buffering** (Media3 ExoPlayer, ~2.5 s start, resilient rebuffer, plays **DASH + HLS + Icecast/MP3/AAC**).
 
 ## Build (no Android Studio needed — GitHub Actions)
@@ -30,7 +29,7 @@ git push -u origin main
 ```
 
 Toolchain (verified latest, June 2026): AGP 9.2.0 · Gradle 9.4.1 · Kotlin 2.3.21 (built-in) · compileSdk 36 ·
-Media3 1.10.1 · Glance 1.1.1 · Compose BOM 2026.05.00 · WorkManager 2.11.2 · DataStore 1.2.1 · Coil 3.4.0.
+Media3 1.10.1 · Compose BOM 2026.05.00 · WorkManager 2.11.2 · DataStore 1.2.1 · Coil 3.4.0.
 
 ## On the tablet (Lenovo Xiaoxin / ZUI)
 
