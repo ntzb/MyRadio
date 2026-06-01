@@ -5,14 +5,13 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.glance.appwidget.updateAll
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StreamResolver
 import com.ntzb.myradio.model.Station
-import com.ntzb.myradio.widget.RadioWidget
+import com.ntzb.myradio.widget.WidgetSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -55,6 +54,12 @@ object PlayerController {
         }
 
     suspend fun playStation(context: Context, station: Station) {
+        // Update the snapshot + widget FIRST (instant), before the possibly-slow resolve/connect.
+        // A widget tap runs in a short-lived Glance action coroutine that can be killed before
+        // playback finishes — doing this up front guarantees the header reflects the new station.
+        PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
+        WidgetSync.sync(context)
+
         val candidates = StreamResolver.resolveCandidates(station)   // resolves on IO
         PlaybackFallback.set(station, candidates)
         val item = PlayerFactory.buildMediaItem(station, candidates.first())
@@ -64,10 +69,6 @@ object PlayerController {
             c.prepare()
             c.play()
         }
-        // Reflect the new station in the widget immediately; the service listener follows up
-        // with ICY/Kan song updates. (Keeps the header/title from lagging on station switch.)
-        PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
-        RadioWidget().updateAll(context)
     }
 
     suspend fun togglePlayPause(context: Context) {

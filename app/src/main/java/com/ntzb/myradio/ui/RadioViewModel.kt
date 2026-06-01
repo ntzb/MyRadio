@@ -5,14 +5,13 @@ import android.content.Context
 import android.media.AudioManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.glance.appwidget.updateAll
 import androidx.media3.common.Player
 import com.ntzb.myradio.data.LikesRepository
 import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.player.PlayerController
-import com.ntzb.myradio.widget.RadioWidget
+import com.ntzb.myradio.widget.WidgetSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,6 +68,8 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
             syncFrom(c)
         }
         _state.update { it.copy(volume = currentSystemVolume()) }
+        // Populate the widget from current state when the app opens.
+        viewModelScope.launch { WidgetSync.sync(getApplication()) }
     }
 
     private fun audioManager() =
@@ -108,8 +109,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleLike(id: String) = viewModelScope.launch {
         LikesRepository.toggle(getApplication(), id)
-        // Liked set drives the widget grid — refresh it immediately.
-        runCatching { RadioWidget().updateAll(getApplication()) }
+        WidgetSync.sync(getApplication())   // mirror liked set into the widget (runs off-main)
     }
 
     fun setVolume(v: Float) {

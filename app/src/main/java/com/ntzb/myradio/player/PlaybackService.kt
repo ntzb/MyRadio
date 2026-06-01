@@ -3,7 +3,6 @@ package com.ntzb.myradio.player
 import android.app.PendingIntent
 import android.content.Intent
 import androidx.annotation.OptIn
-import androidx.glance.appwidget.updateAll
 import com.ntzb.myradio.ui.MainActivity
 import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
@@ -15,7 +14,7 @@ import androidx.media3.session.MediaSessionService
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.NowPlayingResolver
 import com.ntzb.myradio.data.PlaybackSnapshot
-import com.ntzb.myradio.widget.RadioWidget
+import com.ntzb.myradio.widget.WidgetSync
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -141,7 +140,7 @@ class PlaybackService : MediaSessionService() {
                 this@PlaybackService,
                 NowPlaying(stationId, stationName, song, p.isPlaying)
             )
-            RadioWidget().updateAll(this@PlaybackService)
+            WidgetSync.sync(this@PlaybackService)
         }
     }
 }

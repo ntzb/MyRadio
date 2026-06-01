@@ -1,7 +1,6 @@
 package com.ntzb.myradio.work
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -10,7 +9,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.ntzb.myradio.data.StationRepository
-import com.ntzb.myradio.widget.RadioWidget
+import com.ntzb.myradio.widget.WidgetSync
 import java.util.concurrent.TimeUnit
 
 /** Refreshes the station catalog from the idanplus GitHub source every 24h. */
@@ -19,7 +18,7 @@ class RefreshWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val ok = StationRepository.refreshFromRemote(applicationContext)
         return if (ok) {
-            runCatching { RadioWidget().updateAll(applicationContext) }
+            runCatching { WidgetSync.sync(applicationContext) }
             Result.success()
         } else {
             Result.retry()

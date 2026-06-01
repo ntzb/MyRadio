@@ -28,6 +28,8 @@ import androidx.glance.appwidget.lazy.GridCells
 import androidx.glance.appwidget.lazy.LazyVerticalGrid
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -44,8 +46,6 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.ntzb.myradio.R
-import com.ntzb.myradio.data.LikesRepository
-import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.player.PlayerController
@@ -81,29 +81,43 @@ class RadioWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val stations = StationRepository.loadStations(context)
-        val liked = LikesRepository.snapshot(context)
-        val shown = stations.filter { it.id in liked }.ifEmpty { stations }.take(30)
-        val nowPlaying = PlaybackSnapshot.read(context)
-        // Title from the catalog by current station id (reliable), not the metadata string (can lag).
-        val currentName = stations.firstOrNull { it.id == nowPlaying.stationId }?.name
-            ?: nowPlaying.title
+        // Read from the widget's OWN Glance state (written by WidgetSync) — this is what Glance
+        // tracks for recomposition. Reading an external DataStore here would not trigger updates.
+        val prefs = runCatching {
+            getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
+        }.getOrNull()
+        val liked = prefs?.get(WidgetSync.LIKED) ?: emptySet()
+        val npId = prefs?.get(WidgetSync.NP_ID)?.takeIf { it.isNotBlank() }
+        val npName = prefs?.get(WidgetSync.NP_NAME).orEmpty()
+        val npSong = prefs?.get(WidgetSync.NP_SONG).orEmpty()
+        val npPlaying = prefs?.get(WidgetSync.NP_PLAYING) ?: false
+
+        val stations = runCatching { StationRepository.loadStations(context) }.getOrDefault(emptyList())
+        val shown = stations.filter { it.id in liked }.take(30)   // liked only
+        val currentName = stations.firstOrNull { it.id == npId }?.name ?: npName
         val c = colorsFor(context)
-        // Glance can't load URLs into Image — pre-decode logos to bitmaps (cached, downscaled).
-        // No logo → generate an avatar from the station name.
+        // Glance can't load URLs into Image — pre-decode logos (cached); no logo → generated avatar.
         val bitmaps = shown.associate {
-            it.id to (loadLogoBitmap(context, it.logoUri) ?: LogoGenerator.generate(it.name))
+            it.id to (runCatching { loadLogoBitmap(context, it.logoUri) }.getOrNull()
+                ?: LogoGenerator.generate(it.name))
         }
 
         provideContent {
             Column(
                 GlanceModifier.fillMaxSize().background(ColorProvider(c.bg)).padding(8.dp)
             ) {
-                Header(currentName, nowPlaying.song, nowPlaying.isPlaying, c)
+                Header(currentName, npSong, npPlaying, c)
                 Spacer(GlanceModifier.size(6.dp))
-                LazyVerticalGrid(gridCells = GridCells.Adaptive(72.dp)) {
-                    items(shown, itemId = { it.id.hashCode().toLong() }) { station ->
-                        StationTile(station, bitmaps.getValue(station.id), c)
+                if (shown.isEmpty()) {
+                    Text(
+                        text = "Tap ♥ on a station in the app to add it here",
+                        style = TextStyle(color = ColorProvider(c.onBg))
+                    )
+                } else {
+                    LazyVerticalGrid(gridCells = GridCells.Adaptive(72.dp)) {
+                        items(shown, itemId = { it.id.hashCode().toLong() }) { station ->
+                            StationTile(station, bitmaps.getValue(station.id), c)
+                        }
                     }
                 }
             }
