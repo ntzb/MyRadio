@@ -17,8 +17,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
-private const val LOGO_PX = 96
+// Target for the SHORTER side of a logo. The bitmap keeps its aspect ratio; the ImageView's
+// centerCrop fills the square tile. High enough to look crisp on dense screens.
+private const val LOGO_PX = 256
 
 /**
  * Backs the widget's liked-stations GridView. Using a RemoteViewsFactory (rather than the API-31
@@ -60,13 +63,12 @@ class StationGridFactory(private val context: Context) : RemoteViewsService.Remo
     override fun getViewAt(position: Int): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_tile)
         val station = stations.getOrNull(position) ?: return views
-        views.setTextViewText(R.id.tile_name, station.name)
         views.setImageViewBitmap(R.id.tile_logo, logoFor(station))
 
         val isPlaying = station.id == playingId
-        // Outline the station that's currently playing.
+        // Outline the station that's currently playing (box hugs the logo).
         views.setInt(
-            R.id.tile_root, "setBackgroundResource",
+            R.id.tile_box, "setBackgroundResource",
             if (isPlaying) R.drawable.tile_playing_bg else R.drawable.tile_bg
         )
 
@@ -96,9 +98,34 @@ class StationGridFactory(private val context: Context) : RemoteViewsService.Remo
                     .use { it.body?.bytes() }
             else -> null
         } ?: return null
-        val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
-        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return null
-        return Bitmap.createScaledBitmap(decoded, LOGO_PX, LOGO_PX, true).also { cache[uri] = it }
+
+        // Decode bounds first, pick a sample size near the target (keeps decode cheap).
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        val w = bounds.outWidth
+        val h = bounds.outHeight
+        if (w <= 0 || h <= 0) return null
+        var sample = 1
+        while (minOf(w, h) / (sample * 2) >= LOGO_PX) sample *= 2
+        val decoded = BitmapFactory.decodeByteArray(
+            bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample }
+        ) ?: return null
+
+        // Downscale preserving aspect ratio so the SHORTER side == LOGO_PX. NOT forced square —
+        // the ImageView's centerCrop trims the overflow, so logos crop instead of stretch.
+        val minSide = minOf(decoded.width, decoded.height)
+        val scaled = if (minSide > LOGO_PX) {
+            val factor = LOGO_PX.toFloat() / minSide
+            Bitmap.createScaledBitmap(
+                decoded,
+                (decoded.width * factor).roundToInt().coerceAtLeast(1),
+                (decoded.height * factor).roundToInt().coerceAtLeast(1),
+                true
+            )
+        } else {
+            decoded
+        }
+        return scaled.also { cache[uri] = it }
     }
 
     private companion object {

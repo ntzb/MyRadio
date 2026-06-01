@@ -92,11 +92,11 @@
             android:id="@+id/widget_grid"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:columnWidth="68dp"
+            android:columnWidth="72dp"
             android:numColumns="auto_fit"
             android:stretchMode="spacingWidthUniform"
-            android:verticalSpacing="6dp"
-            android:horizontalSpacing="6dp"
+            android:verticalSpacing="10dp"
+            android:horizontalSpacing="10dp"
             android:gravity="center" />
 
         <TextView

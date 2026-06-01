@@ -1,28 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/tile_root"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:gravity="center_horizontal"
-    android:background="@drawable/tile_bg"
-    android:padding="4dp">
+    android:layout_height="wrap_content">
 
-    <ImageView
-        android:id="@+id/tile_logo"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
-        android:scaleType="centerCrop"
-        android:contentDescription="@string/play" />
-
-    <TextView
-        android:id="@+id/tile_name"
-        android:layout_width="match_parent"
+    <!-- The highlight box hugs the logo (the whole cell stays tappable via tile_root). -->
+    <FrameLayout
+        android:id="@+id/tile_box"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:gravity="center"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textSize="10sp"
-        android:textColor="@color/widget_text" />
-</LinearLayout>
+        android:layout_gravity="center"
+        android:padding="5dp"
+        android:background="@drawable/tile_bg">
+
+        <ImageView
+            android:id="@+id/tile_logo"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:scaleType="centerCrop"
+            android:adjustViewBounds="false"
+            android:contentDescription="@string/play" />
+    </FrameLayout>
+</FrameLayout>
