@@ -9,3 +9,7 @@
 .cxx/
 local.properties
 app/build/
+
+# Signing keys — never commit these (kept in GitHub Secrets instead)
+*.jks
+*.keystore

@@ -35,10 +35,11 @@ object NowPlayingResolver {
         "rd_99" to "https://firestore.googleapis.com/v1/projects/eco-99-production/databases/(default)/documents/streamed_content/program?key=AIzaSyCN9DRdNHtF4rixiNqhz8CfzUgIKtAx6jo"
     )
 
-    /** Station id → "track" XML feed (<track><artist>/<name>). */
-    private val trackXmlSources = mapOf(
-        "rd_100" to "https://digital.100fm.co.il/api/nowplaying/100fm/0"
-    )
+    // 100FM: live song feed (<track><artist>/<name>=title) with a fallback to the current
+    // program feed (<track><name>=program, <artist>=host) when no song is reported.
+    private const val FM100_ID = "rd_100"
+    private const val FM100_SONG = "https://digital.100fm.co.il/api/nowplaying/100fm/0"
+    private const val FM100_EPG = "https://epg-out-s3-bucket-42.s3-eu-west-1.amazonaws.com/100fm_epg.xml"
 
     private const val NOSTALGIA_ID = "x_nostalgia"
     private const val NOSTALGIA_PAGE = "https://www.963fm.co.il/"
@@ -51,7 +52,7 @@ object NowPlayingResolver {
         KanNowPlaying.hasChannel(stationId) ||
             xmlSources.containsKey(stationId) ||
             firestoreSources.containsKey(stationId) ||
-            trackXmlSources.containsKey(stationId) ||
+            stationId == FM100_ID ||
             stationId == NOSTALGIA_ID
 
     /** "Artist - Title" (or "Title"), or null if nothing / no source / error. */
@@ -60,16 +61,22 @@ object NowPlayingResolver {
             KanNowPlaying.hasChannel(stationId) -> KanNowPlaying.fetchSong(stationId)
             xmlSources.containsKey(stationId) -> fetchDalet(xmlSources.getValue(stationId))
             firestoreSources.containsKey(stationId) -> fetchFirestore(firestoreSources.getValue(stationId))
-            trackXmlSources.containsKey(stationId) -> fetchTrackXml(trackXmlSources.getValue(stationId))
+            stationId == FM100_ID -> fetch100fm()
             stationId == NOSTALGIA_ID -> fetchNostalgia()
             else -> null
         }
     }
 
-    // --- "track" XML (100FM): <track><artist>/<name> ---
-    private fun fetchTrackXml(url: String): String? {
-        val xml = httpGet(url) ?: return null
-        return combine(xmlTag(xml, "artist"), xmlTag(xml, "name"))
+    /** 100FM: live song (artist/title) if present, else the on-air program ("program עם host"). */
+    private fun fetch100fm(): String? {
+        httpGet(FM100_SONG)?.let { xml ->
+            val title = xmlTag(xml, "name")?.takeIf { it.isNotBlank() }
+            if (title != null) return combine(xmlTag(xml, "artist"), title)
+        }
+        val epg = httpGet(FM100_EPG) ?: return null
+        val program = xmlTag(epg, "name")?.takeIf { it.isNotBlank() } ?: return null
+        val host = xmlTag(epg, "artist")?.takeIf { it.isNotBlank() }
+        return if (host != null) "$program עם $host" else program
     }
 
     // --- Dalet on-air XML (glz / Galgalatz) ---
