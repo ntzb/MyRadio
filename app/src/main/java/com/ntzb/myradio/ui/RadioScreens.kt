@@ -19,14 +19,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeDown
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -250,13 +250,13 @@ fun NowPlayingScreen(state: UiState, vm: RadioViewModel, onBack: () -> Unit) {
             }
             Spacer(Modifier.height(32.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.VolumeDown, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.VolumeDown, contentDescription = null)
                 Slider(
                     value = state.volume,
                     onValueChange = { vm.setVolume(it) },
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
                 )
-                Icon(Icons.Filled.VolumeUp, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null)
             }
         }
     }
