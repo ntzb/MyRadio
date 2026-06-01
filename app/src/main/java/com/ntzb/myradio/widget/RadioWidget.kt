@@ -97,7 +97,7 @@ class RadioWidget : GlanceAppWidget() {
         // Glance can't load URLs into Image — pre-decode logos (cached); no logo → generated avatar.
         val bitmaps = shown.associate {
             it.id to (runCatching { loadLogoBitmap(context, it.logoUri) }.getOrNull()
-                ?: LogoGenerator.generate(it.name))
+                ?: LogoGenerator.generate(it.name, LOGO_PX))
         }
 
         provideContent {
@@ -189,6 +189,7 @@ class RadioWidget : GlanceAppWidget() {
 
 // Logos are static, but provideGlance reruns on every now-playing change. Cache decoded
 // bitmaps process-wide so a song-title tick doesn't re-decode every liked station's logo.
+private const val LOGO_PX = 80   // small on purpose — keeps the widget RemoteViews under the size limit
 private val logoCache = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
 
 /** Loads a logo bitmap from a bundled asset or remote URL, downscaled and cached. */
@@ -206,8 +207,12 @@ private suspend fun loadLogoBitmap(context: Context, uri: String): Bitmap? {
                 }
                 else -> null
             } ?: return@runCatching null
-            val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                ?: return@runCatching null
+            // Downscale hard: many bitmaps embedded in the widget RemoteViews must stay under
+            // the ~1 MB Binder limit, or the system silently drops the whole update.
+            Bitmap.createScaledBitmap(decoded, LOGO_PX, LOGO_PX, true)
         }.getOrNull()?.also { logoCache[uri] = it }
     }
 }
