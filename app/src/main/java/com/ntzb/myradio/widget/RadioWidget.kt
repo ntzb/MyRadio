@@ -85,6 +85,9 @@ class RadioWidget : GlanceAppWidget() {
         val liked = LikesRepository.snapshot(context)
         val shown = stations.filter { it.id in liked }.ifEmpty { stations }.take(30)
         val nowPlaying = PlaybackSnapshot.read(context)
+        // Title from the catalog by current station id (reliable), not the metadata string (can lag).
+        val currentName = stations.firstOrNull { it.id == nowPlaying.stationId }?.name
+            ?: nowPlaying.title
         val c = colorsFor(context)
         // Glance can't load URLs into Image — pre-decode logos to bitmaps (cached, downscaled).
         // No logo → generate an avatar from the station name.
@@ -96,7 +99,7 @@ class RadioWidget : GlanceAppWidget() {
             Column(
                 GlanceModifier.fillMaxSize().background(ColorProvider(c.bg)).padding(8.dp)
             ) {
-                Header(nowPlaying.title, nowPlaying.song, nowPlaying.isPlaying, c)
+                Header(currentName, nowPlaying.song, nowPlaying.isPlaying, c)
                 Spacer(GlanceModifier.size(6.dp))
                 LazyVerticalGrid(gridCells = GridCells.Adaptive(72.dp)) {
                     items(shown, itemId = { it.id.hashCode().toLong() }) { station ->

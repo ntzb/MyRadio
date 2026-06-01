@@ -12,8 +12,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.metadata.icy.IcyInfo
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
-import com.ntzb.myradio.data.KanNowPlaying
 import com.ntzb.myradio.data.NowPlaying
+import com.ntzb.myradio.data.NowPlayingResolver
 import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.widget.RadioWidget
 import kotlinx.coroutines.CoroutineScope
@@ -52,7 +52,7 @@ class PlaybackService : MediaSessionService() {
                 if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
                     icySong = ""
                     polledSong = ""
-                    restartKanPolling(p.currentMediaItem?.mediaId)
+                    restartNowPlayingPolling(p.currentMediaItem?.mediaId)
                 }
                 publish(p)
             }
@@ -113,14 +113,14 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
-    /** Poll Kan's ACRCloud now-playing endpoint while a Kan (DASH) station is playing. */
-    private fun restartKanPolling(stationId: String?) {
+    /** Poll the station's now-playing feed (Kan ACRCloud / glz Dalet XML) while it's playing. */
+    private fun restartNowPlayingPolling(stationId: String?) {
         pollJob?.cancel()
         pollJob = null
-        if (stationId == null || !KanNowPlaying.hasChannel(stationId)) return
+        if (stationId == null || !NowPlayingResolver.hasSource(stationId)) return
         pollJob = scope.launch {
             while (isActive) {
-                val s = KanNowPlaying.fetchSong(stationId).orEmpty()
+                val s = NowPlayingResolver.fetch(stationId).orEmpty()
                 if (s != polledSong) {
                     polledSong = s
                     player?.let { publish(it) }

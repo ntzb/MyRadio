@@ -5,10 +5,14 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.glance.appwidget.updateAll
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.ntzb.myradio.data.NowPlaying
+import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StreamResolver
 import com.ntzb.myradio.model.Station
+import com.ntzb.myradio.widget.RadioWidget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -60,6 +64,10 @@ object PlayerController {
             c.prepare()
             c.play()
         }
+        // Reflect the new station in the widget immediately; the service listener follows up
+        // with ICY/Kan song updates. (Keeps the header/title from lagging on station switch.)
+        PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
+        RadioWidget().updateAll(context)
     }
 
     suspend fun togglePlayPause(context: Context) {
