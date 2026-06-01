@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -48,6 +49,7 @@ fun RadioRoot(vm: RadioViewModel) {
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }
 
     if (showNowPlaying && state.current != null) {
+        BackHandler { showNowPlaying = false }
         NowPlayingScreen(state, vm, onBack = { showNowPlaying = false })
     } else {
         RadioScreen(

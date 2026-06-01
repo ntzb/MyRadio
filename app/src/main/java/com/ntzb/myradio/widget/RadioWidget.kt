@@ -20,6 +20,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.GridCells
 import androidx.glance.appwidget.lazy.LazyVerticalGrid
@@ -29,6 +30,7 @@ import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
+import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
@@ -45,6 +47,8 @@ import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.player.PlayerController
+import com.ntzb.myradio.ui.MainActivity
+import com.ntzb.myradio.util.LogoGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -81,7 +85,10 @@ class RadioWidget : GlanceAppWidget() {
         val nowPlaying = PlaybackSnapshot.read(context)
         val c = colorsFor(context)
         // Glance can't load URLs into Image — pre-decode logos to bitmaps (cached, downscaled).
-        val bitmaps = shown.associate { it.id to loadLogoBitmap(context, it.logoUri) }
+        // No logo → generate an avatar from the station name.
+        val bitmaps = shown.associate {
+            it.id to (loadLogoBitmap(context, it.logoUri) ?: LogoGenerator.generate(it.name))
+        }
 
         provideContent {
             Column(
@@ -91,7 +98,7 @@ class RadioWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.size(6.dp))
                 LazyVerticalGrid(gridCells = GridCells.Adaptive(72.dp)) {
                     items(shown, itemId = { it.id.hashCode().toLong() }) { station ->
-                        StationTile(station, bitmaps[station.id], c)
+                        StationTile(station, bitmaps.getValue(station.id), c)
                     }
                 }
             }
@@ -104,7 +111,8 @@ class RadioWidget : GlanceAppWidget() {
             GlanceModifier.fillMaxWidth().background(ColorProvider(c.header)).cornerRadius(12.dp).padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(GlanceModifier.defaultWeight()) {
+            // Tapping the header (station info area) opens the app.
+            Column(GlanceModifier.defaultWeight().clickable(actionStartActivity<MainActivity>())) {
                 Text(
                     text = title.ifBlank { "Not playing" },
                     maxLines = 1,
@@ -114,11 +122,12 @@ class RadioWidget : GlanceAppWidget() {
                     Text(text = song, maxLines = 1, style = TextStyle(color = ColorProvider(c.onHeader)))
                 }
             }
+            ControlIcon(R.drawable.ic_volume_down, "Volume down", actionRunCallback<VolumeDownAction>(), c)
+            ControlIcon(R.drawable.ic_volume_up, "Volume up", actionRunCallback<VolumeUpAction>(), c)
             ControlIcon(
                 if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
                 "Play/Pause", actionRunCallback<TogglePlayAction>(), c
             )
-            Spacer(GlanceModifier.width(4.dp))
             ControlIcon(R.drawable.ic_stop, "Stop", actionRunCallback<StopAction>(), c)
         }
     }
@@ -139,32 +148,22 @@ class RadioWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun StationTile(station: Station, bitmap: Bitmap?, c: WColors) {
-        Box(GlanceModifier.padding(4.dp), contentAlignment = Alignment.Center) {
-            Box(
-                GlanceModifier.size(64.dp).background(ColorProvider(c.tile)).cornerRadius(12.dp)
-                    .clickable(
-                        actionRunCallback<PlayStationAction>(
-                            actionParametersOf(STATION_ID_PARAM to station.id)
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (bitmap != null) {
-                    Image(
-                        provider = ImageProvider(bitmap),
-                        contentDescription = station.name,
-                        modifier = GlanceModifier.size(58.dp).cornerRadius(10.dp)
-                    )
-                } else {
-                    Image(
-                        provider = ImageProvider(R.drawable.ic_radio),
-                        contentDescription = station.name,
-                        colorFilter = ColorFilter.tint(ColorProvider(c.onBg)),
-                        modifier = GlanceModifier.size(32.dp)
-                    )
-                }
-            }
+    private fun StationTile(station: Station, bitmap: Bitmap, c: WColors) {
+        Box(
+            GlanceModifier.padding(4.dp).clickable(
+                actionRunCallback<PlayStationAction>(
+                    actionParametersOf(STATION_ID_PARAM to station.id)
+                )
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Image(
+                provider = ImageProvider(bitmap),
+                contentDescription = station.name,
+                // Crop fills the square while keeping aspect ratio (no distortion).
+                contentScale = ContentScale.Crop,
+                modifier = GlanceModifier.size(64.dp).cornerRadius(12.dp)
+            )
         }
     }
 }
@@ -213,5 +212,27 @@ class TogglePlayAction : ActionCallback {
 class StopAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         PlayerController.stop(context)
+    }
+}
+
+/** Adjust the system MEDIA stream volume (routes to Bluetooth when connected). */
+private fun adjustVolume(context: Context, direction: Int) {
+    val am = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+    am.adjustStreamVolume(
+        android.media.AudioManager.STREAM_MUSIC,
+        direction,
+        android.media.AudioManager.FLAG_SHOW_UI
+    )
+}
+
+class VolumeUpAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        adjustVolume(context, android.media.AudioManager.ADJUST_RAISE)
+    }
+}
+
+class VolumeDownAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        adjustVolume(context, android.media.AudioManager.ADJUST_LOWER)
     }
 }

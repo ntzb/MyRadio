@@ -26,27 +26,28 @@ object PlayerController {
     private val mutex = Mutex()
     @Volatile private var controller: MediaController? = null
 
-    suspend fun get(context: Context): MediaController {
-        controller?.let { if (it.isConnected) return it }
-        return mutex.withLock {
-            controller?.let { if (it.isConnected) return it }
-            connect(context.applicationContext).also { controller = it }
+    // MediaController must only be touched on the main thread (it throws otherwise). Widget
+    // ActionCallbacks run on a background thread, so the whole get() runs on Main.
+    suspend fun get(context: Context): MediaController = withContext(Dispatchers.Main) {
+        controller?.let { if (it.isConnected) return@withContext it }
+        mutex.withLock {
+            controller?.let { if (it.isConnected) return@withContext it }
+            connectOnMain(context.applicationContext).also { controller = it }
         }
     }
 
-    private suspend fun connect(context: Context): MediaController =
-        withContext(Dispatchers.Main) {
-            suspendCancellableCoroutine { cont ->
-                val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-                val future = MediaController.Builder(context, token).buildAsync()
-                future.addListener(
-                    {
-                        try { cont.resume(future.get()) }
-                        catch (e: Exception) { cont.resumeWithException(e) }
-                    },
-                    ContextCompat.getMainExecutor(context)
-                )
-            }
+    /** Caller must already be on the main thread. */
+    private suspend fun connectOnMain(context: Context): MediaController =
+        suspendCancellableCoroutine { cont ->
+            val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
+            val future = MediaController.Builder(context, token).buildAsync()
+            future.addListener(
+                {
+                    try { cont.resume(future.get()) }
+                    catch (e: Exception) { cont.resumeWithException(e) }
+                },
+                ContextCompat.getMainExecutor(context)
+            )
         }
 
     suspend fun playStation(context: Context, station: Station) {
@@ -76,7 +77,11 @@ object PlayerController {
 
     suspend fun stop(context: Context) {
         val c = get(context)
-        withContext(Dispatchers.Main) { c.stop() }
+        // Stop AND clear the item so the now-playing strip/widget reset to "Not playing".
+        withContext(Dispatchers.Main) {
+            c.stop()
+            c.clearMediaItems()
+        }
     }
 }
 

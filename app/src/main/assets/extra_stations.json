@@ -5,7 +5,7 @@
       "id": "x_kjazz",
       "name": "KJazz 88.1 (KKJZ)",
       "module": "radio",
-      "image": "",
+      "image": "kjazz.png",
       "urls": [
         "https://streaming.live365.com/a49833",
         "https://streaming.live365.com/a45189_2"
@@ -15,7 +15,7 @@
       "id": "x_eagle",
       "name": "104.9 The Eagle (WEGE)",
       "module": "radio",
-      "image": "",
+      "image": "eagle.png",
       "urls": [
         "https://crystalout.surfernetwork.com:8001/WEGE-FM_MP3",
         "http://crystalout.surfernetwork.com:8001/WEGE-FM_MP3",
@@ -26,7 +26,7 @@
       "id": "x_nostalgia",
       "name": "רדיוס נוסטלגי 96.3",
       "module": "radio",
-      "image": "",
+      "image": "nostalgia.jpg",
       "urls": [
         "https://cdna.streamgates.net/radios-audio/Nostalgia_963fm/icecast.audio",
         "http://194.213.4.197:8000/;stream/1"

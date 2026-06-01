@@ -1,8 +1,10 @@
 package com.ntzb.myradio.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.annotation.OptIn
 import androidx.glance.appwidget.updateAll
+import com.ntzb.myradio.ui.MainActivity
 import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -10,13 +12,17 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.extractor.metadata.icy.IcyInfo
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.ntzb.myradio.data.KanNowPlaying
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.widget.RadioWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -30,7 +36,9 @@ class PlaybackService : MediaSessionService() {
     private var player: Player? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    @Volatile private var icySong: String = ""
+    @Volatile private var icySong: String = ""     // from ICY (Icecast streams)
+    @Volatile private var polledSong: String = ""  // from Kan ACRCloud API (DASH streams)
+    private var pollJob: Job? = null
 
     private val listener = object : Player.Listener {
         override fun onEvents(p: Player, events: Player.Events) {
@@ -41,7 +49,11 @@ class PlaybackService : MediaSessionService() {
                     Player.EVENT_PLAYBACK_STATE_CHANGED
                 )
             ) {
-                if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) icySong = ""
+                if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION)) {
+                    icySong = ""
+                    polledSong = ""
+                    restartKanPolling(p.currentMediaItem?.mediaId)
+                }
                 publish(p)
             }
         }
@@ -72,7 +84,14 @@ class PlaybackService : MediaSessionService() {
         val exo = PlayerFactory.buildExoPlayer(this)
         exo.addListener(listener)
         player = exo
-        session = MediaSession.Builder(this, exo).build()
+        // Tapping the media notification opens the app.
+        val openApp = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        session = MediaSession.Builder(this, exo).setSessionActivity(openApp).build()
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -94,12 +113,29 @@ class PlaybackService : MediaSessionService() {
         super.onDestroy()
     }
 
+    /** Poll Kan's ACRCloud now-playing endpoint while a Kan (DASH) station is playing. */
+    private fun restartKanPolling(stationId: String?) {
+        pollJob?.cancel()
+        pollJob = null
+        if (stationId == null || !KanNowPlaying.hasChannel(stationId)) return
+        pollJob = scope.launch {
+            while (isActive) {
+                val s = KanNowPlaying.fetchSong(stationId).orEmpty()
+                if (s != polledSong) {
+                    polledSong = s
+                    player?.let { publish(it) }
+                }
+                delay(20_000)
+            }
+        }
+    }
+
     private fun publish(p: Player) {
         val md = p.mediaMetadata
         val stationId = p.currentMediaItem?.mediaId
         val stationName = md.station?.toString() ?: md.title?.toString().orEmpty()
         val mdSong = md.title?.toString()?.takeIf { it.isNotBlank() && it != stationName }.orEmpty()
-        val song = mdSong.ifBlank { icySong }
+        val song = mdSong.ifBlank { icySong }.ifBlank { polledSong }
         scope.launch {
             PlaybackSnapshot.write(
                 this@PlaybackService,

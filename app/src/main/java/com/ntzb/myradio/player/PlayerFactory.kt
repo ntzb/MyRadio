@@ -24,7 +24,10 @@ object PlayerFactory {
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
-        val dataSource = OkHttpDataSource.Factory(http).setUserAgent(Constants.USER_AGENT)
+        val dataSource = OkHttpDataSource.Factory(http)
+            .setUserAgent(Constants.USER_AGENT)
+            // Ask Icecast/Shoutcast servers to send in-stream ICY metadata (now-playing title).
+            .setDefaultRequestProperties(mapOf("Icy-MetaData" to "1"))
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSource) // auto: dash/hls/progressive
 
         // Tuned for LIVE radio: ~2.5s start, resilient rebuffer, time- (not size-) driven.

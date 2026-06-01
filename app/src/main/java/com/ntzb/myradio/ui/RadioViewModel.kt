@@ -1,18 +1,24 @@
 package com.ntzb.myradio.ui
 
 import android.app.Application
+import android.content.Context
+import android.media.AudioManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.glance.appwidget.updateAll
 import androidx.media3.common.Player
 import com.ntzb.myradio.data.LikesRepository
+import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.player.PlayerController
+import com.ntzb.myradio.widget.RadioWidget
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 data class UiState(
     val stations: List<Station> = emptyList(),
@@ -22,10 +28,13 @@ data class UiState(
     val currentStationId: String? = null,
     val stationName: String = "",
     val song: String = "",
+    val snapshotSong: String = "",   // from PlaybackSnapshot (covers Kan ACRCloud polling)
     val volume: Float = 1f
 ) {
     val liked: List<Station> get() = stations.filter { it.id in likedIds }
     val current: Station? get() = stations.firstOrNull { it.id == currentStationId }
+    /** Song to display: controller's ICY song, else the snapshot (Kan polled) song. */
+    val displaySong: String get() = song.ifBlank { snapshotSong }
 }
 
 class RadioViewModel(app: Application) : AndroidViewModel(app) {
@@ -49,11 +58,26 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            PlaybackSnapshot.flow(getApplication()).collect { np ->
+                _state.update { it.copy(snapshotSong = np.song) }
+            }
+        }
+        viewModelScope.launch {
             val c = PlayerController.get(getApplication())
             player = c
             c.addListener(listener)
             syncFrom(c)
         }
+        _state.update { it.copy(volume = currentSystemVolume()) }
+    }
+
+    private fun audioManager() =
+        getApplication<Application>().getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    private fun currentSystemVolume(): Float {
+        val am = audioManager()
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        return am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max
     }
 
     private fun syncFrom(p: Player) {
@@ -66,8 +90,8 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
                 isBuffering = p.playbackState == Player.STATE_BUFFERING,
                 currentStationId = p.currentMediaItem?.mediaId,
                 stationName = name,
-                song = song,
-                volume = p.volume
+                song = song
+                // volume is system media volume, managed separately (not the player's gain)
             )
         }
     }
@@ -84,11 +108,16 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleLike(id: String) = viewModelScope.launch {
         LikesRepository.toggle(getApplication(), id)
+        // Liked set drives the widget grid — refresh it immediately.
+        runCatching { RadioWidget().updateAll(getApplication()) }
     }
 
     fun setVolume(v: Float) {
-        player?.volume = v.coerceIn(0f, 1f)
-        _state.update { it.copy(volume = v.coerceIn(0f, 1f)) }
+        val vol = v.coerceIn(0f, 1f)
+        val am = audioManager()
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, (vol * max).roundToInt(), 0)
+        _state.update { it.copy(volume = vol) }
     }
 
     override fun onCleared() {

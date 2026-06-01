@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.SubcomposeAsyncImage
 import com.ntzb.myradio.model.Station
+import com.ntzb.myradio.util.LogoGenerator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -134,7 +135,7 @@ private fun StationRow(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StationLogo(station.logoUri, Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)))
+            StationLogo(station.logoUri, station.name, Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -169,7 +170,7 @@ private fun NowPlayingStrip(state: UiState, vm: RadioViewModel, onOpen: () -> Un
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StationLogo(state.current?.logoUri ?: "", Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)))
+            StationLogo(state.current?.logoUri ?: "", state.current?.name ?: "", Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)))
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(
                     state.stationName.ifBlank { state.current?.name ?: "" },
@@ -177,7 +178,7 @@ private fun NowPlayingStrip(state: UiState, vm: RadioViewModel, onOpen: () -> Un
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val sub = state.song.ifBlank { if (state.isBuffering) "Buffering…" else "Live" }
+                val sub = state.displaySong.ifBlank { if (state.isBuffering) "Buffering…" else "Live" }
                 Text(
                     sub,
                     style = MaterialTheme.typography.bodySmall,
@@ -221,13 +222,14 @@ fun NowPlayingScreen(state: UiState, vm: RadioViewModel, onBack: () -> Unit) {
         ) {
             StationLogo(
                 state.current?.logoUri ?: "",
+                state.current?.name ?: "",
                 Modifier.size(220.dp).clip(RoundedCornerShape(16.dp))
             )
             Spacer(Modifier.height(28.dp))
             Text(state.current?.name ?: "", style = MaterialTheme.typography.headlineSmall, maxLines = 2)
             Spacer(Modifier.height(8.dp))
             Text(
-                if (state.song.isNotBlank()) state.song
+                if (state.displaySong.isNotBlank()) state.displaySong
                 else if (state.isBuffering) "Buffering…" else "Live",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -261,7 +263,7 @@ fun NowPlayingScreen(state: UiState, vm: RadioViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun StationLogo(uri: String, modifier: Modifier = Modifier) {
+fun StationLogo(uri: String, name: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     when {
         uri.startsWith("file:///android_asset/") -> {
@@ -277,31 +279,25 @@ fun StationLogo(uri: String, modifier: Modifier = Modifier) {
             }
             bitmap?.let {
                 Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
-            } ?: PlaceholderLogo(modifier)
+            } ?: GeneratedLogo(name, modifier)
         }
         uri.startsWith("http") -> {
             SubcomposeAsyncImage(
                 model = uri,
                 contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = modifier,
-                loading = { PlaceholderLogo(Modifier.fillMaxSize()) },
-                error = { PlaceholderLogo(Modifier.fillMaxSize()) }
+                loading = { GeneratedLogo(name, Modifier.fillMaxSize()) },
+                error = { GeneratedLogo(name, Modifier.fillMaxSize()) }
             )
         }
-        else -> PlaceholderLogo(modifier)
+        else -> GeneratedLogo(name, modifier)
     }
 }
 
+/** Fallback avatar generated from the station name (matches the widget's generated logos). */
 @Composable
-private fun PlaceholderLogo(modifier: Modifier = Modifier) {
-    Box(
-        modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            Icons.Filled.Radio,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun GeneratedLogo(name: String, modifier: Modifier = Modifier) {
+    val bmp = remember(name) { LogoGenerator.generate(name).asImageBitmap() }
+    Image(bmp, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
 }

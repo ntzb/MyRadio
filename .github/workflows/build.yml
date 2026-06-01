@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to publish the APK to a Release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,9 +31,21 @@ jobs:
       - name: Build debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk MyRadio.apk
+
+      # Raw, directly-downloadable APK (not zipped) on the Releases page.
+      - name: Publish APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest debug build
+          files: MyRadio.apk
+
+      # Also keep it as a build artifact (zipped) for history.
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: israradio-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: myradio-debug
+          path: MyRadio.apk
           if-no-files-found: error
