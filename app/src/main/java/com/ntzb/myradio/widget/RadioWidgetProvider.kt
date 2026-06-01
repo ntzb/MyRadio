@@ -21,7 +21,17 @@ import kotlinx.coroutines.launch
 class RadioWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, mgr: AppWidgetManager, ids: IntArray) {
-        // System-triggered (placement, resize, reboot): do a full rebuild.
+        // System-triggered (placement, reboot): do a full rebuild.
+        runAsync(context) { WidgetUpdater.pushAll(context) }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        mgr: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: android.os.Bundle
+    ) {
+        // Widget resized → rebuild so the header text re-scales to the new width.
         runAsync(context) { WidgetUpdater.pushAll(context) }
     }
 

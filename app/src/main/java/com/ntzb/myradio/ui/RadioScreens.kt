@@ -278,14 +278,14 @@ fun StationLogo(uri: String, name: String, modifier: Modifier = Modifier) {
                 }
             }
             bitmap?.let {
-                Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+                Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit)
             } ?: GeneratedLogo(name, modifier)
         }
         uri.startsWith("http") -> {
             SubcomposeAsyncImage(
                 model = uri,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = modifier,
                 loading = { GeneratedLogo(name, Modifier.fillMaxSize()) },
                 error = { GeneratedLogo(name, Modifier.fillMaxSize()) }

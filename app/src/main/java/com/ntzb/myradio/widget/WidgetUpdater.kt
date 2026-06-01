@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.TypedValue
 import android.widget.RemoteViews
 import com.ntzb.myradio.R
 import com.ntzb.myradio.data.NowPlaying
@@ -57,6 +58,13 @@ object WidgetUpdater {
     fun buildRoot(context: Context, appWidgetId: Int, np: NowPlaying?): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_radio)
         applyHeader(context, views, np)
+
+        // Scale the header text with the widget's width so it isn't tiny on a large (tablet) widget.
+        val opts = AppWidgetManager.getInstance(context).getAppWidgetOptions(appWidgetId)
+        val minWidthDp = opts?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+        val titleSp = (if (minWidthDp > 0) minWidthDp / 16f else 16f).coerceIn(16f, 30f)
+        views.setTextViewTextSize(R.id.np_title, TypedValue.COMPLEX_UNIT_SP, titleSp)
+        views.setTextViewTextSize(R.id.np_song, TypedValue.COMPLEX_UNIT_SP, (titleSp - 3f))
 
         // Unique intent per widget id so the launcher keeps multiple instances distinct.
         val adapterIntent = Intent(context, StationWidgetService::class.java).apply {
