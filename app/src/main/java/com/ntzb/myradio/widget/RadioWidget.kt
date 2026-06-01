@@ -28,8 +28,6 @@ import androidx.glance.appwidget.lazy.GridCells
 import androidx.glance.appwidget.lazy.LazyVerticalGrid
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.state.getAppWidgetState
-import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -46,6 +44,8 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.ntzb.myradio.R
+import com.ntzb.myradio.data.LikesRepository
+import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.player.PlayerController
@@ -81,20 +81,18 @@ class RadioWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Read from the widget's OWN Glance state (written by WidgetSync) — this is what Glance
-        // tracks for recomposition. Reading an external DataStore here would not trigger updates.
-        val prefs = runCatching {
-            getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
-        }.getOrNull()
-        val liked = prefs?.get(WidgetSync.LIKED) ?: emptySet()
-        val npId = prefs?.get(WidgetSync.NP_ID)?.takeIf { it.isNotBlank() }
-        val npName = prefs?.get(WidgetSync.NP_NAME).orEmpty()
-        val npSong = prefs?.get(WidgetSync.NP_SONG).orEmpty()
-        val npPlaying = prefs?.get(WidgetSync.NP_PLAYING) ?: false
-
+        // Read the app's DataStore directly (the pattern from Google's Glance sample). A fresh
+        // off-main updateAll() re-runs this and picks up the latest values. All reads are guarded:
+        // a throwing provideGlance makes Glance keep the OLD widget (looks like "didn't update").
         val stations = runCatching { StationRepository.loadStations(context) }.getOrDefault(emptyList())
+        val liked = runCatching { LikesRepository.snapshot(context) }.getOrDefault(emptySet())
+        val np = runCatching { PlaybackSnapshot.read(context) }.getOrNull()
+
         val shown = stations.filter { it.id in liked }.take(30)   // liked only
-        val currentName = stations.firstOrNull { it.id == npId }?.name ?: npName
+        val npSong = np?.song.orEmpty()
+        val npPlaying = np?.isPlaying ?: false
+        val currentName = stations.firstOrNull { it.id == np?.stationId }?.name
+            ?: np?.title.orEmpty()
         val c = colorsFor(context)
         // Glance can't load URLs into Image — pre-decode logos (cached); no logo → generated avatar.
         val bitmaps = shown.associate {
