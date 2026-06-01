@@ -11,6 +11,7 @@ import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StreamResolver
 import com.ntzb.myradio.model.Station
+import com.ntzb.myradio.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -56,6 +57,7 @@ object PlayerController {
         // Write the snapshot FIRST (instant) so the now-playing strip reflects the new station
         // immediately, before the possibly-slow stream resolve/connect.
         PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
+        WidgetUpdater.pushHeader(context)   // instant station name in the widget header
 
         val candidates = StreamResolver.resolveCandidates(station)   // resolves on IO
         PlaybackFallback.set(station, candidates)

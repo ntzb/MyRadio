@@ -14,6 +14,7 @@ import androidx.media3.session.MediaSessionService
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.NowPlayingResolver
 import com.ntzb.myradio.data.PlaybackSnapshot
+import com.ntzb.myradio.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,6 +37,7 @@ class PlaybackService : MediaSessionService() {
 
     @Volatile private var icySong: String = ""     // from ICY (Icecast streams)
     @Volatile private var polledSong: String = ""  // from Kan ACRCloud API (DASH streams)
+    @Volatile private var lastWidgetStationId: String? = null  // to detect station changes for the widget
     private var pollJob: Job? = null
 
     private val listener = object : Player.Listener {
@@ -139,6 +141,13 @@ class PlaybackService : MediaSessionService() {
                 this@PlaybackService,
                 NowPlaying(stationId, stationName, song, p.isPlaying)
             )
+            // Station change → full rebuild (moves the "playing" outline); otherwise just the header.
+            if (stationId != lastWidgetStationId) {
+                lastWidgetStationId = stationId
+                WidgetUpdater.pushAll(this@PlaybackService)
+            } else {
+                WidgetUpdater.pushHeader(this@PlaybackService)
+            }
         }
     }
 }

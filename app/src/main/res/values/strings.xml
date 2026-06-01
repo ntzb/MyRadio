@@ -4,4 +4,13 @@
     <string name="not_playing">Not playing</string>
     <string name="all_stations">All</string>
     <string name="liked_stations">Liked</string>
+
+    <!-- Widget -->
+    <string name="widget_description">Play your liked radio stations</string>
+    <string name="widget_empty">Tap ♥ on a station in the app to add it here</string>
+    <string name="play">Play</string>
+    <string name="play_pause">Play / pause</string>
+    <string name="stop">Stop</string>
+    <string name="vol_up">Volume up</string>
+    <string name="vol_down">Volume down</string>
 </resources>

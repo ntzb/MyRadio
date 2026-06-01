@@ -36,5 +36,24 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name=".widget.RadioWidgetProvider"
+            android:exported="true">
+            <!-- Only the system APPWIDGET_UPDATE is declared. Our control taps use *explicit*
+                 PendingIntents (component-targeted), which are delivered without a filter entry —
+                 so we don't expose play/stop as actions any other app could broadcast. -->
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/radio_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.StationWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
+
     </application>
 </manifest>

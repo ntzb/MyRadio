@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="10dp">
+
+    <!-- Now-playing header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <LinearLayout
+            android:id="@+id/np_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingEnd="6dp">
+
+            <TextView
+                android:id="@+id/np_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:textColor="@color/widget_text"
+                android:text="@string/app_name" />
+
+            <TextView
+                android:id="@+id/np_song"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textSize="12sp"
+                android:textColor="@color/widget_text_dim"
+                android:text="@string/not_playing" />
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/btn_vol_down"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_volume_down"
+            android:tint="@color/widget_icon"
+            android:contentDescription="@string/vol_down" />
+
+        <ImageView
+            android:id="@+id/btn_vol_up"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_volume_up"
+            android:tint="@color/widget_icon"
+            android:contentDescription="@string/vol_up" />
+
+        <ImageView
+            android:id="@+id/btn_toggle"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_play"
+            android:tint="@color/widget_icon"
+            android:contentDescription="@string/play_pause" />
+
+        <ImageView
+            android:id="@+id/btn_stop"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:padding="8dp"
+            android:src="@drawable/ic_stop"
+            android:tint="@color/widget_icon"
+            android:contentDescription="@string/stop" />
+    </LinearLayout>
+
+    <!-- Liked-stations grid (+ empty state) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <GridView
+            android:id="@+id/widget_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:columnWidth="68dp"
+            android:numColumns="auto_fit"
+            android:stretchMode="spacingWidthUniform"
+            android:verticalSpacing="6dp"
+            android:horizontalSpacing="6dp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:padding="12dp"
+            android:textSize="13sp"
+            android:textColor="@color/widget_text_dim"
+            android:text="@string/widget_empty" />
+    </FrameLayout>
+</LinearLayout>

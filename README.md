@@ -1,6 +1,6 @@
 # MyRadio
 
-A native Android radio app. Station list and logos are reused from the
+A native Android radio app + home-screen widget. Station list and logos are reused from the
 [idanplus Kodi addon](https://github.com/Fishenzon/repo); built to play Israeli stations
 (including Kan's DASH streams that trip up most apps) plus a few extras.
 
@@ -9,8 +9,9 @@ A native Android radio app. Station list and logos are reused from the
 - **Station list** with one-tap play, current-station highlight.
 - **Like (♥)** stations — persisted; bottom tabs switch **Liked / All**.
 - **Now-playing strip** above the tabs (play/pause/stop) → tap to open the **Now-Playing screen** (controls, volume, song title via ICY metadata).
+- **Home-screen widget** (classic `RemoteViews`, **not** Glance): grid of your liked stations as tap-to-play tiles, now-playing header with play/pause/stop + volume −/+, and the **currently-playing station is outlined**. Updates are pushed directly via `AppWidgetManager` from the foreground playback service (`partiallyUpdateAppWidget` for the header) — instant and reliable, with none of Glance's session-lock throttling.
 - **24h auto-refresh** of the station list from the idanplus GitHub `channels.json`, with the bundled copy as a fallback and hardcoded **backup streams**.
-- **Auto / light / dark** theming (Material You dynamic color).
+- **Auto / light / dark** theming (Material You dynamic color in-app; `-night` resources for the widget).
 - **Live-radio buffering** (Media3 ExoPlayer, ~2.5 s start, resilient rebuffer, plays **DASH + HLS + Icecast/MP3/AAC**).
 
 ## Build (no Android Studio needed — GitHub Actions)

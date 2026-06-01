@@ -11,6 +11,7 @@ import com.ntzb.myradio.data.PlaybackSnapshot
 import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.player.PlayerController
+import com.ntzb.myradio.widget.WidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +68,8 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
             syncFrom(c)
         }
         _state.update { it.copy(volume = currentSystemVolume()) }
+        // Refresh any placed widget from current state when the app opens.
+        viewModelScope.launch { WidgetUpdater.pushAll(getApplication()) }
     }
 
     private fun audioManager() =
@@ -106,6 +109,7 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleLike(id: String) = viewModelScope.launch {
         LikesRepository.toggle(getApplication(), id)
+        WidgetUpdater.pushAll(getApplication())   // add/remove the station in the widget grid
     }
 
     fun setVolume(v: Float) {

@@ -1,0 +1,114 @@
+package com.ntzb.myradio.widget
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.widget.RemoteViews
+import android.widget.RemoteViewsService
+import com.ntzb.myradio.R
+import com.ntzb.myradio.data.LikesRepository
+import com.ntzb.myradio.data.PlaybackSnapshot
+import com.ntzb.myradio.data.StationRepository
+import com.ntzb.myradio.model.Station
+import com.ntzb.myradio.util.LogoGenerator
+import kotlinx.coroutines.runBlocking
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+
+private const val LOGO_PX = 96
+
+/**
+ * Backs the widget's liked-stations GridView. Using a RemoteViewsFactory (rather than the API-31
+ * inline RemoteCollectionItems) is deliberate: it streams item RemoteViews lazily, so the many
+ * station-logo bitmaps never get packed into one oversized parcel — the failure mode that the
+ * docs warn about for bitmap-heavy collections.
+ */
+class StationWidgetService : RemoteViewsService() {
+    override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
+        StationGridFactory(applicationContext)
+}
+
+class StationGridFactory(private val context: Context) : RemoteViewsService.RemoteViewsFactory {
+
+    private var stations: List<Station> = emptyList()
+    private var playingId: String? = null
+
+    override fun onCreate() {}
+
+    override fun onDataSetChanged() {
+        val result = runCatching {
+            runBlocking {
+                val all = StationRepository.loadStations(context)
+                val liked = LikesRepository.snapshot(context)
+                val np = runCatching { PlaybackSnapshot.read(context) }.getOrNull()
+                Pair(all.filter { it.id in liked }, np?.stationId)
+            }
+        }.getOrNull()
+        stations = result?.first ?: emptyList()
+        playingId = result?.second
+    }
+
+    override fun onDestroy() {
+        stations = emptyList()
+    }
+
+    override fun getCount(): Int = stations.size
+
+    override fun getViewAt(position: Int): RemoteViews {
+        val views = RemoteViews(context.packageName, R.layout.widget_tile)
+        val station = stations.getOrNull(position) ?: return views
+        views.setTextViewText(R.id.tile_name, station.name)
+        views.setImageViewBitmap(R.id.tile_logo, logoFor(station))
+
+        val isPlaying = station.id == playingId
+        // Outline the station that's currently playing.
+        views.setInt(
+            R.id.tile_root, "setBackgroundResource",
+            if (isPlaying) R.drawable.tile_playing_bg else R.drawable.tile_bg
+        )
+
+        val fillIn = Intent().putExtra(RadioWidgetProvider.EXTRA_STATION_ID, station.id)
+        views.setOnClickFillInIntent(R.id.tile_root, fillIn)
+        return views
+    }
+
+    override fun getLoadingView(): RemoteViews? = null
+    override fun getViewTypeCount(): Int = 1
+    override fun getItemId(position: Int): Long =
+        stations.getOrNull(position)?.id?.hashCode()?.toLong() ?: position.toLong()
+    override fun hasStableIds(): Boolean = true
+
+    private fun logoFor(station: Station): Bitmap =
+        runCatching { loadLogo(station.logoUri) }.getOrNull()
+            ?: LogoGenerator.generate(station.name, LOGO_PX)
+
+    private fun loadLogo(uri: String): Bitmap? {
+        if (uri.isBlank()) return null
+        cache[uri]?.let { return it }
+        val bytes = when {
+            uri.startsWith("file:///android_asset/") ->
+                context.assets.open(uri.removePrefix("file:///android_asset/")).use { it.readBytes() }
+            uri.startsWith("http") ->
+                http.newCall(Request.Builder().url(uri).build()).execute()
+                    .use { it.body?.bytes() }
+            else -> null
+        } ?: return null
+        val opts = BitmapFactory.Options().apply { inSampleSize = 4 }
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts) ?: return null
+        return Bitmap.createScaledBitmap(decoded, LOGO_PX, LOGO_PX, true).also { cache[uri] = it }
+    }
+
+    private companion object {
+        val cache = ConcurrentHashMap<String, Bitmap>()
+        // Short timeouts: a slow logo host must not stall the grid's binder thread — we fall back
+        // to a generated avatar instead.
+        val http: OkHttpClient = OkHttpClient.Builder()
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(4, TimeUnit.SECONDS)
+            .callTimeout(6, TimeUnit.SECONDS)
+            .build()
+    }
+}

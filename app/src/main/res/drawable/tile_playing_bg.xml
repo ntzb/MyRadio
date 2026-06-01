@@ -1,0 +1,7 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <!-- Highlight for the station that's currently playing. -->
+    <solid android:color="@color/widget_playing_fill" />
+    <corners android:radius="12dp" />
+    <stroke android:width="2dp" android:color="@color/widget_icon" />
+</shape>

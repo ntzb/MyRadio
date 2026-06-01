@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Widget palette (dark). Applied automatically when the system is in dark mode. -->
+    <color name="widget_bg">#FF1C1C1E</color>
+    <color name="widget_text">#FFF2F2F2</color>
+    <color name="widget_text_dim">#FFB0B0B0</color>
+    <color name="widget_icon">#FFD7E3F0</color>
+    <color name="widget_playing_fill">#33D7E3F0</color>
+</resources>
