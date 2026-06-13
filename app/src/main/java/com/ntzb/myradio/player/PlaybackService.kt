@@ -85,7 +85,9 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         val exoPlayer = PlayerFactory.buildExoPlayer(this)
         exoPlayer.addListener(listener)
-        val fwd = RadioMetadataPlayer(exoPlayer)
+        val fwd = RadioMetadataPlayer(exoPlayer) { forward ->
+            scope.launch { PlayerController.skipToLiked(this@PlaybackService, forward) }
+        }
         exo = exoPlayer
         metadataPlayer = fwd
         // Tapping the media notification opens the app.

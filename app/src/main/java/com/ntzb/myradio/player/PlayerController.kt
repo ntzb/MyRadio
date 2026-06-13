@@ -7,8 +7,10 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.ntzb.myradio.data.LikesRepository
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.PlaybackSnapshot
+import com.ntzb.myradio.data.StationRepository
 import com.ntzb.myradio.data.StreamResolver
 import com.ntzb.myradio.model.Station
 import com.ntzb.myradio.widget.WidgetUpdater
@@ -27,7 +29,11 @@ import kotlin.coroutines.resumeWithException
 object PlayerController {
 
     private val mutex = Mutex()
+    private val skipMutex = Mutex()                       // serializes next/previous presses
     @Volatile private var controller: MediaController? = null
+    // The intended current station, updated synchronously on play/stop. Used by skipToLiked so
+    // rapid presses advance step-by-step (the MediaController's currentMediaItem lags behind).
+    @Volatile private var currentStationId: String? = null
 
     // MediaController must only be touched on the main thread (it throws otherwise),
     // so the whole get() runs on Main.
@@ -60,10 +66,14 @@ object PlayerController {
         WidgetUpdater.pushHeader(context)   // instant station name in the widget header
 
         val candidates = StreamResolver.resolveCandidates(station)   // resolves on IO
+        val firstUrl = candidates.firstOrNull() ?: return            // nothing resolvable → bail
         PlaybackFallback.set(station, candidates)
-        val item = PlayerFactory.buildMediaItem(station, candidates.first())
+        val item = PlayerFactory.buildMediaItem(station, firstUrl)
         val c = get(context)
         withContext(Dispatchers.Main) {
+            // Set the "current" only when we actually commit to playing — ordered with setMediaItem
+            // on Main, so a racing list-tap and a skip can't leave currentStationId out of sync.
+            currentStationId = station.id
             c.setMediaItem(item)
             c.prepare()
             c.play()
@@ -84,12 +94,33 @@ object PlayerController {
     }
 
     suspend fun stop(context: Context) {
+        currentStationId = null
         val c = get(context)
         // Stop AND clear the item so the now-playing strip resets to "Not playing".
         withContext(Dispatchers.Main) {
             c.stop()
             c.clearMediaItems()
         }
+    }
+
+    /**
+     * Skip to the next/previous LIKED station, in catalog order (same order the app/widget show),
+     * wrapping around. Drives the next/previous transport keys in Android Auto, the notification,
+     * and the app. If nothing liked, does nothing; if the current station isn't liked, jumps to the
+     * first (forward) or last (backward) liked station.
+     */
+    suspend fun skipToLiked(context: Context, forward: Boolean) = skipMutex.withLock {
+        val liked = StationRepository.loadStations(context)
+            .filter { it.id in LikesRepository.snapshot(context) }
+        if (liked.isEmpty()) return@withLock
+        val idx = liked.indexOfFirst { it.id == currentStationId }
+        val n = liked.size
+        val target = if (idx < 0) (if (forward) 0 else n - 1)
+            else (((idx + (if (forward) 1 else -1)) % n) + n) % n
+        val targetStation = liked[target]
+        // Avoid re-buffering the same station (only liked station, or wrapped onto self).
+        if (targetStation.id == currentStationId) return@withLock
+        playStation(context, targetStation)
     }
 }
 

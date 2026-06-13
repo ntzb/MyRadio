@@ -105,6 +105,9 @@ class RadioViewModel(app: Application) : AndroidViewModel(app) {
         PlayerController.togglePlayPause(getApplication())
     }
 
+    fun next() = viewModelScope.launch { PlayerController.skipToLiked(getApplication(), true) }
+    fun previous() = viewModelScope.launch { PlayerController.skipToLiked(getApplication(), false) }
+
     fun stop() = viewModelScope.launch { PlayerController.stop(getApplication()) }
 
     fun toggleLike(id: String) = viewModelScope.launch {

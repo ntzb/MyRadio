@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
@@ -236,6 +238,10 @@ fun NowPlayingScreen(state: UiState, vm: RadioViewModel, onBack: () -> Unit) {
             )
             Spacer(Modifier.height(32.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedIconButton(onClick = { vm.previous() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous liked station")
+                }
+                Spacer(Modifier.width(16.dp))
                 FilledIconButton(onClick = { vm.togglePlayPause() }, modifier = Modifier.size(72.dp)) {
                     Icon(
                         if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -243,10 +249,14 @@ fun NowPlayingScreen(state: UiState, vm: RadioViewModel, onBack: () -> Unit) {
                         modifier = Modifier.size(40.dp)
                     )
                 }
-                Spacer(Modifier.width(24.dp))
-                OutlinedIconButton(onClick = { vm.stop() }, modifier = Modifier.size(56.dp)) {
-                    Icon(Icons.Filled.Stop, contentDescription = "Stop")
+                Spacer(Modifier.width(16.dp))
+                OutlinedIconButton(onClick = { vm.next() }, modifier = Modifier.size(56.dp)) {
+                    Icon(Icons.Filled.SkipNext, contentDescription = "Next liked station")
                 }
+            }
+            Spacer(Modifier.height(16.dp))
+            OutlinedIconButton(onClick = { vm.stop() }, modifier = Modifier.size(56.dp)) {
+                Icon(Icons.Filled.Stop, contentDescription = "Stop")
             }
             Spacer(Modifier.height(32.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

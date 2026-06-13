@@ -17,10 +17,32 @@ import androidx.media3.common.util.UnstableApi
  * PlaybackSnapshot, so it's unaffected.
  */
 @OptIn(UnstableApi::class)
-class RadioMetadataPlayer(player: Player) : ForwardingPlayer(player) {
+class RadioMetadataPlayer(
+    player: Player,
+    /** Invoked when next (true) / previous (false) is pressed — switches the liked station. */
+    private val onSkip: (forward: Boolean) -> Unit
+) : ForwardingPlayer(player) {
 
     @Volatile private var song: String = ""
     private val listeners = mutableListOf<Player.Listener>()
+
+    // Advertise next/previous so the transport keys appear in Android Auto and the notification.
+    // Live radio is a single MediaItem, so we override the seek-to-next/previous commands to mean
+    // "switch to the next/previous liked station" instead of seeking within a (non-existent) queue.
+    override fun getAvailableCommands(): Player.Commands =
+        super.getAvailableCommands().buildUpon()
+            .add(Player.COMMAND_SEEK_TO_NEXT)
+            .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+            .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+            .build()
+
+    override fun hasNextMediaItem(): Boolean = true
+    override fun hasPreviousMediaItem(): Boolean = true
+    override fun seekToNext() = onSkip(true)
+    override fun seekToNextMediaItem() = onSkip(true)
+    override fun seekToPrevious() = onSkip(false)
+    override fun seekToPreviousMediaItem() = onSkip(false)
 
     /** Called when the resolved song changes; refreshes metadata listeners (notification/UI). */
     fun setSong(song: String) {
