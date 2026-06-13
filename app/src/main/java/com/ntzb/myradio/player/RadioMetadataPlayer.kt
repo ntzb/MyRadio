@@ -37,10 +37,33 @@ class RadioMetadataPlayer(player: Player) : ForwardingPlayer(player) {
     override fun getMediaMetadata(): MediaMetadata {
         val base = super.getMediaMetadata()
         val station = base.station ?: base.title
+        val hasSong = song.isNotBlank()
+        val (artist, title) = splitSong(song)
         return base.buildUpon()
-            .apply { station?.let { setTitle(it) } }   // keep the station as the title
-            .apply { if (song.isNotBlank()) setArtist(song) }
+            // title/artist drive the media notification (station + full "artist - title").
+            .apply { station?.let { setTitle(it) } }
+            .apply { if (hasSong) setArtist(song) }
+            // displayTitle/subtitle are what Android Auto & Bluetooth read, and the now-playing
+            // card shows only two lines. So: line 1 = song title (or station when idle),
+            // line 2 = "artist · station" — keeps all three (station, artist, title) visible.
+            // (subtitle is ignored unless displayTitle is set, so displayTitle is always set.)
+            .setDisplayTitle(if (hasSong && title.isNotBlank()) title else station)
+            .apply {
+                val sub = when {
+                    !hasSong -> null
+                    artist.isNotBlank() && station != null -> "$artist · $station"
+                    artist.isNotBlank() -> artist
+                    else -> station
+                }
+                setSubtitle(sub)
+            }
             .build()
+    }
+
+    /** Splits a combined "Artist - Title" (as produced by NowPlayingResolver) back into the two. */
+    private fun splitSong(s: String): Pair<String, String> {
+        val i = s.indexOf(" - ")
+        return if (i > 0) s.substring(0, i).trim() to s.substring(i + 3).trim() else "" to s.trim()
     }
 
     override fun addListener(listener: Player.Listener) {
