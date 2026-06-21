@@ -52,7 +52,26 @@ object PlayerFactory {
     }
 
     /**
-     * Builds a MediaItem with the correct MIME so ExoPlayer picks the right source.
+     * A lightweight MediaItem carrying only the station id + metadata, NO URI. The controller hands
+     * this to the session; the session's onAddMediaItems resolves it to a playable URL. This is
+     * required because Media3 strips the URI (localConfiguration) on the controller→session IPC, so
+     * resolving must happen session-side — doing it once here avoids a wasteful double resolve.
+     */
+    fun buildRequestItem(station: Station): MediaItem {
+        val artwork = station.logoUri.takeIf { it.isNotBlank() }?.let(Uri::parse)
+        val metadata = MediaMetadata.Builder()
+            .setTitle(station.name)
+            .setStation(station.name)
+            .apply { artwork?.let { setArtworkUri(it) } }
+            .build()
+        return MediaItem.Builder()
+            .setMediaId(station.id)
+            .setMediaMetadata(metadata)
+            .build()
+    }
+
+    /**
+     * Builds a fully playable MediaItem (with URI + correct MIME) so ExoPlayer picks the right source.
      * Critical: Kan uses `.livx` (DASH) which has no recognized extension, so we must
      * declare APPLICATION_MPD explicitly or it would wrongly fall through to progressive.
      */

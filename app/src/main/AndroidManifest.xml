@@ -17,6 +17,11 @@
         android:usesCleartextTraffic="true"
         android:theme="@style/Theme.MyRadio">
 
+        <!-- Declares MyRadio as an Android Auto media app. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
@@ -31,8 +36,12 @@
             android:name=".player.PlaybackService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
+            <!-- MediaLibraryService + the legacy MediaBrowserService action so Android Auto
+                 (and other browsers) can discover, browse, and control playback. -->
             <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 

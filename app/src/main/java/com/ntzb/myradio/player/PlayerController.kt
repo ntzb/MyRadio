@@ -59,22 +59,39 @@ object PlayerController {
             )
         }
 
-    suspend fun playStation(context: Context, station: Station) {
-        // Write the snapshot FIRST (instant) so the now-playing strip reflects the new station
-        // immediately, before the possibly-slow stream resolve/connect.
-        PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
-        WidgetUpdater.pushHeader(context)   // instant station name in the widget header
-
+    /**
+     * Resolves a station to a fully playable MediaItem (URI + MIME) and records it as the current
+     * station (fallback URL list, snapshot, widget header, currentStationId). Returns null if
+     * nothing resolves. Called SESSION-SIDE from [PlaybackService.onAddMediaItems] — the single
+     * resolution point for every play (app, widget, Android Auto), since the URI is stripped on the
+     * controller→session IPC and must be supplied there.
+     */
+    suspend fun prepareStation(context: Context, station: Station): MediaItem? {
         val candidates = StreamResolver.resolveCandidates(station)   // resolves on IO
-        val firstUrl = candidates.firstOrNull() ?: return            // nothing resolvable → bail
+        val firstUrl = candidates.firstOrNull()
+        if (firstUrl == null) {
+            // Nothing resolvable (e.g. a dynamic station scraped with no network). Clear the
+            // fallback so a later onPlayerError can't resurrect the PREVIOUS station's URLs.
+            PlaybackFallback.clear()
+            return null
+        }
         PlaybackFallback.set(station, candidates)
-        val item = PlayerFactory.buildMediaItem(station, firstUrl)
+        currentStationId = station.id
+        PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
+        WidgetUpdater.pushHeader(context)
+        return PlayerFactory.buildMediaItem(station, firstUrl)
+    }
+
+    suspend fun playStation(context: Context, station: Station) {
+        // Set the intended current + instant snapshot/widget feedback BEFORE the (session-side)
+        // resolve, so the now-playing strip updates immediately. Hand the session a mediaId-only
+        // request item; onAddMediaItems resolves the actual URL (single resolution, no double work).
+        currentStationId = station.id
+        PlaybackSnapshot.write(context, NowPlaying(station.id, station.name, "", true))
+        WidgetUpdater.pushHeader(context)
         val c = get(context)
         withContext(Dispatchers.Main) {
-            // Set the "current" only when we actually commit to playing — ordered with setMediaItem
-            // on Main, so a racing list-tap and a skip can't leave currentStationId out of sync.
-            currentStationId = station.id
-            c.setMediaItem(item)
+            c.setMediaItem(PlayerFactory.buildRequestItem(station))
             c.prepare()
             c.play()
         }
@@ -139,11 +156,29 @@ object PlaybackFallback {
         this.index = 0
     }
 
+    /** Forget the current station's URLs (used when a station fails to resolve). */
+    fun clear() {
+        station = null
+        candidates = emptyList()
+        index = 0
+    }
+
+    /** Id of the station the fallback list currently belongs to (for stale-retry detection). */
+    fun stationId(): String? = station?.id
+
     /** The next fallback MediaItem for the current station, or null if exhausted. */
     fun nextItem(): MediaItem? {
         val st = station ?: return null
         if (index + 1 >= candidates.size) return null
         index++
         return PlayerFactory.buildMediaItem(st, candidates[index])
+    }
+
+    /** Restart from the primary URL (used by the indefinite reconnect retry). Null if none. */
+    fun firstItem(): MediaItem? {
+        val st = station ?: return null
+        if (candidates.isEmpty()) return null
+        index = 0
+        return PlayerFactory.buildMediaItem(st, candidates[0])
     }
 }
