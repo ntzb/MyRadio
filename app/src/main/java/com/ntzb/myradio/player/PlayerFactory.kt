@@ -1,7 +1,6 @@
 package com.ntzb.myradio.player
 
 import android.content.Context
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -13,6 +12,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.ntzb.myradio.data.LogoProvider
 import com.ntzb.myradio.model.Station
 import okhttp3.OkHttpClient
 
@@ -58,7 +58,8 @@ object PlayerFactory {
      * resolving must happen session-side — doing it once here avoids a wasteful double resolve.
      */
     fun buildRequestItem(station: Station): MediaItem {
-        val artwork = station.logoUri.takeIf { it.isNotBlank() }?.let(Uri::parse)
+        // Artwork is served through our content:// provider (Auto can't read bundled assets).
+        val artwork = station.logoUri.takeIf { it.isNotBlank() }?.let { LogoProvider.uriFor(station.id) }
         val metadata = MediaMetadata.Builder()
             .setTitle(station.name)
             .setStation(station.name)
@@ -84,7 +85,7 @@ object PlayerFactory {
             url.contains(".m3u8") -> MimeTypes.APPLICATION_M3U8
             else -> null
         }
-        val artwork = station.logoUri.takeIf { it.isNotBlank() }?.let(Uri::parse)
+        val artwork = station.logoUri.takeIf { it.isNotBlank() }?.let { LogoProvider.uriFor(station.id) }
         val metadata = MediaMetadata.Builder()
             .setTitle(station.name)
             .setStation(station.name)

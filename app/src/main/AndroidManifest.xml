@@ -64,5 +64,14 @@
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="false" />
 
+        <!-- Serves station logos as content:// URIs so Android Auto (a different process that can't
+             read our bundled assets) can show them in its lists and now-playing. Read-only; only
+             returns logo bytes keyed by station id. -->
+        <provider
+            android:name=".data.LogoProvider"
+            android:authorities="com.ntzb.myradio.logos"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+
     </application>
 </manifest>

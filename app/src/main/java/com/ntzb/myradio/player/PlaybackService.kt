@@ -2,7 +2,6 @@ package com.ntzb.myradio.player
 
 import android.app.PendingIntent
 import android.content.Intent
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -19,6 +18,8 @@ import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
+import com.ntzb.myradio.data.LikesRepository
+import com.ntzb.myradio.data.LogoProvider
 import com.ntzb.myradio.data.NowPlaying
 import com.ntzb.myradio.data.NowPlayingResolver
 import com.ntzb.myradio.data.PlaybackSnapshot
@@ -145,12 +146,23 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
             val future = SettableFuture.create<LibraryResult<ImmutableList<MediaItem>>>()
             scope.launch {
-                // We return the whole (small) station list in one page; later pages are empty so a
-                // paginating browser doesn't duplicate entries.
-                val items = if (parentId == ROOT_ID && page == 0) {
-                    ImmutableList.copyOf(loadStations().map(::stationToBrowsableItem))
-                } else {
-                    ImmutableList.of()
+                // The root shows two folders (Liked / All); each lists its stations. We return the
+                // whole list in one page; later pages are empty so a paginating browser doesn't
+                // duplicate entries. Logos are tiny content:// URIs here (Auto fetches each lazily).
+                val items: ImmutableList<MediaItem> = when {
+                    parentId == ROOT_ID && page == 0 -> ImmutableList.of(
+                        folderItem(LIKED_ID, "Liked"),
+                        folderItem(ALL_ID, "All stations")
+                    )
+                    parentId == LIKED_ID && page == 0 -> {
+                        val liked = LikesRepository.snapshot(this@PlaybackService)
+                        ImmutableList.copyOf(
+                            loadStations().filter { it.id in liked }.map(::stationToBrowsableItem)
+                        )
+                    }
+                    parentId == ALL_ID && page == 0 ->
+                        ImmutableList.copyOf(loadStations().map(::stationToBrowsableItem))
+                    else -> ImmutableList.of()
                 }
                 future.set(LibraryResult.ofItemList(items, params))
             }
@@ -164,8 +176,12 @@ class PlaybackService : MediaLibraryService() {
         ): ListenableFuture<LibraryResult<MediaItem>> {
             val future = SettableFuture.create<LibraryResult<MediaItem>>()
             scope.launch {
-                val item = if (mediaId == ROOT_ID) rootItem()
-                    else loadStations().firstOrNull { it.id == mediaId }?.let(::stationToBrowsableItem)
+                val item = when (mediaId) {
+                    ROOT_ID -> rootItem()
+                    LIKED_ID -> folderItem(LIKED_ID, "Liked")
+                    ALL_ID -> folderItem(ALL_ID, "All stations")
+                    else -> loadStations().firstOrNull { it.id == mediaId }?.let(::stationToBrowsableItem)
+                }
                 future.set(
                     if (item != null) LibraryResult.ofItem(item, null)
                     else LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
@@ -218,6 +234,18 @@ class PlaybackService : MediaLibraryService() {
         )
         .build()
 
+    private fun folderItem(id: String, title: String): MediaItem = MediaItem.Builder()
+        .setMediaId(id)
+        .setMediaMetadata(
+            MediaMetadata.Builder()
+                .setTitle(title)
+                .setIsBrowsable(true)
+                .setIsPlayable(false)
+                .setMediaType(MediaMetadata.MEDIA_TYPE_FOLDER_MIXED)
+                .build()
+        )
+        .build()
+
     private fun stationToBrowsableItem(st: Station): MediaItem = MediaItem.Builder()
         .setMediaId(st.id)
         .setMediaMetadata(
@@ -226,9 +254,9 @@ class PlaybackService : MediaLibraryService() {
                 .setIsBrowsable(false)
                 .setIsPlayable(true)
                 .setMediaType(MediaMetadata.MEDIA_TYPE_MUSIC)
-                // Only http art loads in Auto's process (asset:// can't); skip otherwise.
+                // Served via our content:// provider so the logo loads in Auto's process.
                 .apply {
-                    st.logoUri.takeIf { it.startsWith("http") }?.let { setArtworkUri(Uri.parse(it)) }
+                    st.logoUri.takeIf { it.isNotBlank() }?.let { setArtworkUri(LogoProvider.uriFor(st.id)) }
                 }
                 .build()
         )
@@ -318,6 +346,8 @@ class PlaybackService : MediaLibraryService() {
 
     private companion object {
         const val ROOT_ID = "root"
+        const val LIKED_ID = "liked"
+        const val ALL_ID = "all"
         const val RETRY_MIN_MS = 2_000L
         const val RETRY_MAX_MS = 30_000L
     }
