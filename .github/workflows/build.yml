@@ -115,18 +115,26 @@ jobs:
             echo "|------|--------|---------|"
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # VirusTotal (APK) — best-effort detection counts via the v3 API, else the report link.
+          # VirusTotal (APK). A freshly-uploaded APK is usually still being analysed, and the file
+          # endpoint reports last_analysis_stats as all-zero until engines report — so 0 malicious
+          # only means "clean" once the engine TOTAL is > 0. Poll up to ~90s, else say it's pending.
           if [ -n "$VT_API_KEY" ] && [ -f MyRadio.apk ]; then
             sha=$(sha256sum MyRadio.apk | cut -d' ' -f1)
             link="https://www.virustotal.com/gui/file/$sha"
-            stats=$(curl -s -H "x-apikey: $VT_API_KEY" "https://www.virustotal.com/api/v3/files/$sha" || true)
-            mal=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.malicious // empty' 2>/dev/null)
-            sus=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.suspicious // empty' 2>/dev/null)
-            if [ -n "$mal" ]; then
-              if [ "$mal" = "0" ] && [ "${sus:-0}" = "0" ]; then icon="🟢"; else icon="🔴"; fi
-              result="$icon ${mal} malicious / ${sus:-0} suspicious"
+            mal=0; sus=0; total=0
+            for _ in 1 2 3 4 5 6; do
+              stats=$(curl -s -H "x-apikey: $VT_API_KEY" "https://www.virustotal.com/api/v3/files/$sha" || true)
+              mal=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.malicious // 0' 2>/dev/null)
+              sus=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.suspicious // 0' 2>/dev/null)
+              total=$(echo "$stats" | jq -r '[(.data.attributes.last_analysis_stats // {}) | .[]] | add // 0' 2>/dev/null)
+              [ "${total:-0}" -gt 0 ] 2>/dev/null && break
+              sleep 15
+            done
+            if [ "${total:-0}" -gt 0 ] 2>/dev/null; then
+              if [ "${mal:-0}" = "0" ] && [ "${sus:-0}" = "0" ]; then icon="🟢"; else icon="🔴"; fi
+              result="$icon ${mal} malicious / ${sus} suspicious (of ${total} engines)"
             else
-              result="⏳ analysis pending"
+              result="⏳ still analysing — open report shortly"
             fi
             echo "| VirusTotal (APK) | ${result} | [report]($link) |" >> "$GITHUB_STEP_SUMMARY"
           else
