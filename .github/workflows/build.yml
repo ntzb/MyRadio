@@ -9,22 +9,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # needed to publish the APK to a Release
+      contents: write          # publish the APK to a Release
+      security-events: write   # upload Trivy SARIF + read code-scanning alert counts
+    env:
+      # Surfaced as an env var so we can skip the scan when the secret isn't configured
+      # (secrets can't be referenced directly in a step `if:`).
+      VT_API_KEY: ${{ secrets.VT_API_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: "9.4.1"
 
@@ -49,9 +54,21 @@ jobs:
       - name: Rename APK
         run: cp app/build/outputs/apk/debug/app-debug.apk MyRadio.apk
 
+      # Scan the built APK against 70+ AV engines. Informational (continue-on-error) so a transient
+      # VirusTotal hiccup or a generic false-positive doesn't block the release; the report link is
+      # printed in the step log.
+      - name: Scan APK with VirusTotal
+        id: vt
+        if: env.VT_API_KEY != ''
+        continue-on-error: true
+        uses: crazy-max/ghaction-virustotal@d34968c958ae283fe976efed637081b9f9dcf74f # v4
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          files: MyRadio.apk
+
       # Raw, directly-downloadable APK (not zipped) on the Releases page.
       - name: Publish APK to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: latest
           name: Latest debug build
@@ -59,8 +76,72 @@ jobs:
 
       # Also keep it as a build artifact (zipped) for history.
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: myradio-debug
           path: MyRadio.apk
           if-no-files-found: error
+
+      # --- Security scans (results consolidated into the run summary table below) ---
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          format: sarif
+          output: trivy.sarif
+          exit-code: "0"   # report-only; don't fail the build
+
+      - name: Upload Trivy results to the Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+        with:
+          sarif_file: trivy.sarif
+
+      - name: Security summary
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VT_ANALYSIS: ${{ steps.vt.outputs.analysis }}
+        run: |
+          {
+            echo "## 🔒 Security scans"
+            echo ""
+            echo "| Scan | Result | Details |"
+            echo "|------|--------|---------|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # VirusTotal (APK) — best-effort detection counts via the v3 API, else the report link.
+          if [ -n "$VT_API_KEY" ] && [ -f MyRadio.apk ]; then
+            link="${VT_ANALYSIS##*=}"
+            sha=$(sha256sum MyRadio.apk | cut -d' ' -f1)
+            stats=$(curl -s -H "x-apikey: $VT_API_KEY" "https://www.virustotal.com/api/v3/files/$sha" || true)
+            mal=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.malicious // empty' 2>/dev/null)
+            sus=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.suspicious // empty' 2>/dev/null)
+            if [ -n "$mal" ]; then
+              if [ "$mal" = "0" ] && [ "${sus:-0}" = "0" ]; then icon="🟢"; else icon="🔴"; fi
+              result="$icon ${mal} malicious / ${sus:-0} suspicious"
+            else
+              result="⏳ analysis pending"
+            fi
+            echo "| VirusTotal (APK) | ${result} | [report](${link:-https://www.virustotal.com}) |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| VirusTotal (APK) | ⚪ skipped (no VT_API_KEY) | — |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Trivy — count of HIGH/CRITICAL findings from this run.
+          if [ -f trivy.sarif ]; then
+            n=$(jq '[.runs[].results[]] | length' trivy.sarif 2>/dev/null || echo "?")
+            if [ "$n" = "0" ]; then icon="🟢"; else icon="🔴"; fi
+            echo "| Trivy (deps/secrets/config) | ${icon} ${n} HIGH/CRITICAL | Security ▸ Code scanning |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Trivy (deps/secrets/config) | ⚪ not run | — |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Code scanning open alerts (includes CodeQL, which runs as its own setup) + Dependabot.
+          alerts=$(gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&per_page=100" --jq 'length' 2>/dev/null || echo "n/a")
+          if [ "$alerts" = "0" ]; then icon="🟢"; elif [ "$alerts" = "n/a" ]; then icon="⚪"; else icon="🟡"; fi
+          echo "| CodeQL / code scanning (all tools) | ${icon} ${alerts} open | [Code scanning](https://github.com/${GITHUB_REPOSITORY}/security/code-scanning) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Dependabot | 🔗 see alerts | [Dependabot](https://github.com/${GITHUB_REPOSITORY}/security/dependabot) |" >> "$GITHUB_STEP_SUMMARY"
