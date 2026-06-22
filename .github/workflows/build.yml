@@ -107,7 +107,6 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-          VT_ANALYSIS: ${{ steps.vt.outputs.analysis }}
         run: |
           {
             echo "## 🔒 Security scans"
@@ -118,8 +117,8 @@ jobs:
 
           # VirusTotal (APK) — best-effort detection counts via the v3 API, else the report link.
           if [ -n "$VT_API_KEY" ] && [ -f MyRadio.apk ]; then
-            link="${VT_ANALYSIS##*=}"
             sha=$(sha256sum MyRadio.apk | cut -d' ' -f1)
+            link="https://www.virustotal.com/gui/file/$sha"
             stats=$(curl -s -H "x-apikey: $VT_API_KEY" "https://www.virustotal.com/api/v3/files/$sha" || true)
             mal=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.malicious // empty' 2>/dev/null)
             sus=$(echo "$stats" | jq -r '.data.attributes.last_analysis_stats.suspicious // empty' 2>/dev/null)
@@ -129,7 +128,7 @@ jobs:
             else
               result="⏳ analysis pending"
             fi
-            echo "| VirusTotal (APK) | ${result} | [report](${link:-https://www.virustotal.com}) |" >> "$GITHUB_STEP_SUMMARY"
+            echo "| VirusTotal (APK) | ${result} | [report]($link) |" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "| VirusTotal (APK) | ⚪ skipped (no VT_API_KEY) | — |" >> "$GITHUB_STEP_SUMMARY"
           fi
