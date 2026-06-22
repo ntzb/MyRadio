@@ -4,7 +4,7 @@ agp = "9.2.0"               # requires Gradle 9.4.1+, JDK 17+, max API 36.1
 kotlin = "2.3.21"           # built-in Kotlin in AGP 9; compose/serialization plugins must match
 composeBom = "2026.06.00"
 # Libraries — verified latest stable
-coreKtx = "1.13.1"
+coreKtx = "1.19.0"
 lifecycle = "2.11.0"
 activityCompose = "1.12.3"
 media3 = "1.10.1"
