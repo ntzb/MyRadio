@@ -83,7 +83,10 @@ jobs:
           if-no-files-found: error
 
       # --- Security scans (results consolidated into the run summary table below) ---
+      # Runs even if the build failed — it scans the source, and keeps the SARIF upload below
+      # (which is `if: always()`) from erroring on a missing file.
       - name: Trivy filesystem scan
+        if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs

@@ -9,7 +9,7 @@ plugins {
 
 android {
     namespace = "com.ntzb.myradio"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.ntzb.myradio"
