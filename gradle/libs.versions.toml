@@ -1,6 +1,6 @@
 [versions]
 # Toolchain — verified latest stable (June 2026)
-agp = "9.2.0"               # requires Gradle 9.4.1+, JDK 17+, max API 36.1
+agp = "9.2.1"               # requires Gradle 9.4.1+, JDK 17+, max API 36.1
 kotlin = "2.4.0"           # built-in Kotlin in AGP 9; compose/serialization plugins must match
 composeBom = "2026.06.00"
 # Libraries — verified latest stable
